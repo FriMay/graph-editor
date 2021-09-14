@@ -3,9 +3,9 @@ import ReactFlow from 'react-flow-renderer';
 import {useState} from "react";
 import EdgeComponent from "./domains/EdgeComponent";
 import NodeComponent from "./domains/NodeComponent";
-import {message, notification, Button, InputNumber, Space, Upload, Input, Card} from 'antd';
+import {message, notification, Button, InputNumber, Space, Upload, Input, Card, Divider} from 'antd';
 import 'antd/dist/antd.css';
-import { UploadOutlined } from '@ant-design/icons';
+import {UploadOutlined} from '@ant-design/icons';
 import calculate from "./domains/DijkstraAlgorithm";
 
 const red = "red";
@@ -138,7 +138,6 @@ function App() {
         edges: []
     });
     const [edgeWeigh, setEdgeWeigh] = useState(1);
-    const [shortestPath, setShortestPath] = useState("asd");
 
     return (
         <>
@@ -148,359 +147,358 @@ function App() {
                 transform: 'translate(-50%, -50%)',
                 height: "100%"
             }}>
-                <Space>
-                    <Button type="primary" onClick={() => {
-
-                        clearResults(state);
-
-                        getSelectNodes(state).forEach(node => {
-                            node.selectedAt = undefined;
-                        })
-
-                        const nodes = state.nodes;
-
-                        nodes[nextNodeId] = createNode(nextNodeId++, (-userX + (window.innerWidth / 2) - 300)/userScale, (-userY + (window.innerHeight / 2) - 200)/userScale);
-                        setState(JSON.parse(JSON.stringify(state)));
-
-                    }}>Add Node</Button>
-                    <Button
-                        type="primary"
-                        disabled={getSelectNodes(state).length === 0}
-                        onClick={() => {
+                <div style={{background: "rgba(217,255,147,0.66)"}}>
+                    <Space>
+                        <Button type="primary" onClick={() => {
 
                             clearResults(state);
 
-                            const selectNodes = getSelectNodes(state);
-
-                            selectNodes.forEach(node => {
-
-                                delete state.nodes[node.id];
-
-                                while (true) {
-
-                                    let index = state.edges.findIndex(a => a.from === node.id || a.to === node.id);
-
-                                    if (index < 0) {
-                                        break;
-                                    }
-
-                                    state.edges.splice(index, 1);
-                                }
+                            getSelectNodes(state).forEach(node => {
+                                node.selectedAt = undefined;
                             })
 
-                            let indexes = [];
+                            const nodes = state.nodes;
 
-                            for (let i in state.nodes) {
-                                indexes.push(parseInt(i));
-                            }
+                            nodes[nextNodeId] = createNode(nextNodeId++, (-userX + (window.innerWidth / 2) - 300) / userScale, (-userY + (window.innerHeight / 2) - 200) / userScale);
+                            setState(JSON.parse(JSON.stringify(state)));
 
-                            indexes.sort((a, b) => {
+                        }}>Add Node</Button>
+                        <Button
+                            type="primary"
+                            disabled={getSelectNodes(state).length === 0}
+                            onClick={() => {
 
-                                if (a === b) {
-                                    return 0;
-                                }
+                                clearResults(state);
 
-                                if (a > b) {
-                                    return 1;
-                                }
+                                const selectNodes = getSelectNodes(state);
 
-                                return 0;
-                            })
+                                selectNodes.forEach(node => {
 
-                            for (let i = 0; i < indexes.length; ++i) {
+                                    delete state.nodes[node.id];
 
-                                const node = state.nodes[indexes[i]];
+                                    while (true) {
 
-                                const oldNodeId = node.id;
-                                const newNodeId = (i + 1).toString();
+                                        let index = state.edges.findIndex(a => a.from === node.id || a.to === node.id);
 
-                                node.id = newNodeId;
+                                        if (index < 0) {
+                                            break;
+                                        }
 
-                                delete state.nodes[oldNodeId];
-
-                                state.nodes[newNodeId] = node;
-
-                                state.edges.forEach(edge => {
-
-                                    if (edge.from === oldNodeId) {
-                                        edge.from = newNodeId;
-                                    }
-
-                                    if (edge.to === oldNodeId) {
-                                        edge.to = newNodeId;
+                                        state.edges.splice(index, 1);
                                     }
                                 })
-                            }
 
-                            nextNodeId = indexes.length + 1;
+                                let indexes = [];
 
-                            setState(JSON.parse(JSON.stringify(state)));
+                                for (let i in state.nodes) {
+                                    indexes.push(parseInt(i));
+                                }
 
-                    }}>Delete Nodes</Button>
-                    <Button
-                        type="primary"
-                        disabled={getSelectNodes(state).length !== 2}
-                        onClick={() => {
+                                indexes.sort((a, b) => {
 
-                            clearResults(state);
-
-                            if (!edgeWeigh) {
-                                message.error("Edge weigh can't be empty.");
-                                return;
-                            }
-
-                            debugger
-
-                            const selectNodes = getSelectNodes(state);
-
-                            const from = selectNodes[0];
-                            const to = selectNodes[1];
-
-                            let edge = state.edges.find(edge => (edge.from === from.id && edge.to === to.id) || (edge.to === from.id && edge.from === to.id));
-
-                            if (edge) {
-                                edge.weigh = edgeWeigh;
-                            } else {
-                                state.edges.push({
-                                    from: from.id,
-                                    to: to.id,
-                                    weigh: edgeWeigh
-                                });
-                            }
-
-                            from.selectedAt = undefined;
-                            to.selectedAt = undefined;
-
-                            setState(JSON.parse(JSON.stringify(state)));
-
-                        }}>Make Edge</Button>
-                    <InputNumber
-                        min={1}
-                        value={edgeWeigh}
-                        onChange={setEdgeWeigh}
-                        placeholder="Edge Weigh"
-                        style={{ width: '115px' }}
-                    />
-                    <Button
-                        type="primary"
-                        block={!isHaveResults}
-                        onClick={() => {
-
-                            clearResults(state);
-
-                            setState(JSON.parse(JSON.stringify(state)));
-
-                        }}>Clear results</Button>
-                    <Button
-                        type="primary"
-                        onClick={() => {
-
-                            clearResults(state);
-
-                            let text = "";
-                            for (const edge of state.edges) {
-                                text += `${edge.from} ${edge.to} ${edge.weigh}\n`;
-                            }
-
-                            const filename = "matrix.txt";
-                            const blob = new Blob([text], {type: 'text/plain'});
-
-                            if (window.navigator && window.navigator.msSaveOrOpenBlob) {
-                                window.navigator.msSaveOrOpenBlob(blob, filename);
-                            } else{
-                                var e = document.createEvent('MouseEvents'),
-                                    a = document.createElement('a');
-                                a.download = filename;
-                                a.href = window.URL.createObjectURL(blob);
-                                a.dataset.downloadurl = ['text/plain', a.download, a.href].join(':');
-                                e.initEvent('click', true, false, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
-                                a.dispatchEvent(e);
-                            }
-
-                        }}>Save as matrix</Button>
-                    <Button
-                        type="primary"
-                        onClick={() => {
-
-                            clearResults(state);
-
-                            const filename = "graph.json";
-                            const blob = new Blob([JSON.stringify(state)], {type: 'text/plain'});
-
-                            if (window.navigator && window.navigator.msSaveOrOpenBlob) {
-                                window.navigator.msSaveOrOpenBlob(blob, filename);
-                            } else{
-                                var e = document.createEvent('MouseEvents'),
-                                    a = document.createElement('a');
-                                a.download = filename;
-                                a.href = window.URL.createObjectURL(blob);
-                                a.dataset.downloadurl = ['text/plain', a.download, a.href].join(':');
-                                e.initEvent('click', true, false, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
-                                a.dispatchEvent(e);
-                            }
-
-                        }}>Save as json</Button>
-                    <Upload
-                        showUploadList={false}
-                        beforeUpload={file => {
-
-                            file.text()
-                                .then(text => {
-
-                                    const newState = {
-                                        nodes: {},
-                                        edges: []
+                                    if (a === b) {
+                                        return 0;
                                     }
 
-                                    let x = window.innerWidth / 2
-                                    let y = window.innerHeight / 2
+                                    if (a > b) {
+                                        return 1;
+                                    }
 
-                                    let isX = true;
+                                    return 0;
+                                })
 
-                                    for (const line of text.split("\n")) {
+                                for (let i = 0; i < indexes.length; ++i) {
 
-                                        if (line.trim().length === 0) {
-                                            continue;
+                                    const node = state.nodes[indexes[i]];
+
+                                    const oldNodeId = node.id;
+                                    const newNodeId = (i + 1).toString();
+
+                                    node.id = newNodeId;
+
+                                    delete state.nodes[oldNodeId];
+
+                                    state.nodes[newNodeId] = node;
+
+                                    state.edges.forEach(edge => {
+
+                                        if (edge.from === oldNodeId) {
+                                            edge.from = newNodeId;
                                         }
 
-                                        const parts = line.replace("\n", "").split(" ");
+                                        if (edge.to === oldNodeId) {
+                                            edge.to = newNodeId;
+                                        }
+                                    })
+                                }
 
-                                        const from = parseInt(parts[0]);
+                                nextNodeId = indexes.length + 1;
 
-                                        const to = parseInt(parts[1]);
+                                setState(JSON.parse(JSON.stringify(state)));
 
-                                        const weigh = parseInt(parts[2]);
+                            }}>Delete Nodes</Button>
+                        <Button
+                            type="primary"
+                            disabled={getSelectNodes(state).length !== 2}
+                            onClick={() => {
 
-                                        newState.nodes[from] = createNode(from, x, y);
-                                        newState.nodes[to] = createNode(to, x - (isX ? 100 : 0), y - (!isX ? 100 : 0));
-                                        newState.edges.push({
-                                            from,
-                                            to,
-                                            weigh
-                                        });
+                                clearResults(state);
 
-                                        nextNodeId = Math.max(from, to, nextNodeId);
+                                if (!edgeWeigh) {
+                                    message.error("Edge weigh can't be empty.");
+                                    return;
+                                }
 
-                                        if (isX) {
-                                            x += 100;
-                                        } else {
-                                            y += 100;
+                                debugger
+
+                                const selectNodes = getSelectNodes(state);
+
+                                const from = selectNodes[0];
+                                const to = selectNodes[1];
+
+                                let edge = state.edges.find(edge => (edge.from === from.id && edge.to === to.id) || (edge.to === from.id && edge.from === to.id));
+
+                                if (edge) {
+                                    edge.weigh = edgeWeigh;
+                                } else {
+                                    state.edges.push({
+                                        from: from.id,
+                                        to: to.id,
+                                        weigh: edgeWeigh
+                                    });
+                                }
+
+                                from.selectedAt = undefined;
+                                to.selectedAt = undefined;
+
+                                setState(JSON.parse(JSON.stringify(state)));
+
+                            }}>Make Edge</Button>
+                        <InputNumber
+                            min={1}
+                            value={edgeWeigh}
+                            onChange={setEdgeWeigh}
+                            placeholder="Edge Weigh"
+                            style={{width: '115px'}}
+                        />
+                    </Space>
+                    <br/><br/>
+                    <Space>
+                        <Button
+                            type="primary"
+                            onClick={() => {
+
+                                clearResults(state);
+
+                                let text = "";
+                                for (const edge of state.edges) {
+                                    text += `${edge.from} ${edge.to} ${edge.weigh}\n`;
+                                }
+
+                                const filename = "matrix.txt";
+                                const blob = new Blob([text], {type: 'text/plain'});
+
+                                if (window.navigator && window.navigator.msSaveOrOpenBlob) {
+                                    window.navigator.msSaveOrOpenBlob(blob, filename);
+                                } else {
+                                    var e = document.createEvent('MouseEvents'),
+                                        a = document.createElement('a');
+                                    a.download = filename;
+                                    a.href = window.URL.createObjectURL(blob);
+                                    a.dataset.downloadurl = ['text/plain', a.download, a.href].join(':');
+                                    e.initEvent('click', true, false, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
+                                    a.dispatchEvent(e);
+                                }
+
+                            }}>Save as matrix</Button>
+                        <Button
+                            type="primary"
+                            onClick={() => {
+
+                                clearResults(state);
+
+                                const filename = "graph.json";
+                                const blob = new Blob([JSON.stringify(state)], {type: 'text/plain'});
+
+                                if (window.navigator && window.navigator.msSaveOrOpenBlob) {
+                                    window.navigator.msSaveOrOpenBlob(blob, filename);
+                                } else {
+                                    var e = document.createEvent('MouseEvents'),
+                                        a = document.createElement('a');
+                                    a.download = filename;
+                                    a.href = window.URL.createObjectURL(blob);
+                                    a.dataset.downloadurl = ['text/plain', a.download, a.href].join(':');
+                                    e.initEvent('click', true, false, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
+                                    a.dispatchEvent(e);
+                                }
+
+                            }}>Save as json</Button>
+                        <Upload
+                            showUploadList={false}
+                            beforeUpload={file => {
+
+                                file.text()
+                                    .then(text => {
+
+                                        const newState = {
+                                            nodes: {},
+                                            edges: []
                                         }
 
-                                        isX = !isX;
-                                    }
+                                        let x = window.innerWidth / 2
+                                        let y = window.innerHeight / 2
 
-                                    nextNodeId++;
+                                        let isX = true;
 
-                                    setState(newState);
-                                });
-                        }}><Button icon={<UploadOutlined />}>Load from matrix</Button></Upload>
-                    <Upload
-                        showUploadList={false}
-                        beforeUpload={file => {
+                                        for (const line of text.split("\n")) {
 
-                            file.text()
-                                .then(text => {
+                                            if (line.trim().length === 0) {
+                                                continue;
+                                            }
 
-                                    const newState = JSON.parse(text);
+                                            const parts = line.replace("\n", "").split(" ");
 
-                                    for (const i in newState.nodes) {
-                                        nextNodeId = Math.max(nextNodeId, newState.nodes[i].id);
-                                    }
+                                            const from = parseInt(parts[0]);
 
-                                    nextNodeId++;
+                                            const to = parseInt(parts[1]);
 
-                                    setState(newState);
-                                });
-                        }}><Button icon={<UploadOutlined />}>Load from json</Button></Upload>
-                    <Button
-                        type="primary"
-                        disabled={isBlock(state)}
-                        onClick={() => {
+                                            const weigh = parseInt(parts[2]);
 
-                            clearResults(state);
+                                            newState.nodes[from] = createNode(from, x, y);
+                                            newState.nodes[to] = createNode(to, x - (isX ? 100 : 0), y - (!isX ? 100 : 0));
+                                            newState.edges.push({
+                                                from,
+                                                to,
+                                                weigh
+                                            });
 
-                            if (!edgeWeigh) {
-                                message.error("Edge weigh can't be empty.");
-                                return;
-                            }
+                                            nextNodeId = Math.max(from, to, nextNodeId);
 
-                            debugger
+                                            if (isX) {
+                                                x += 100;
+                                            } else {
+                                                y += 100;
+                                            }
 
-                            const selectNodes = getSelectNodes(state);
+                                            isX = !isX;
+                                        }
 
-                            const from = selectNodes[0];
-                            const to = selectNodes[1];
+                                        nextNodeId++;
 
-                            let index = state.edges.findIndex(edge => (edge.from === from.id && edge.to === to.id) || (edge.to === from.id && edge.from === to.id));
+                                        setState(newState);
+                                    });
+                            }}><Button icon={<UploadOutlined/>}>Load from matrix</Button></Upload>
+                        <Upload
+                            showUploadList={false}
+                            beforeUpload={file => {
 
-                            if (index >= 0) {
-                                state.edges.splice(index, 1);
-                            }
+                                file.text()
+                                    .then(text => {
 
-                            from.selectedAt = undefined;
-                            to.selectedAt = undefined;
+                                        const newState = JSON.parse(text);
 
-                            setState(JSON.parse(JSON.stringify(state)));
+                                        for (const i in newState.nodes) {
+                                            nextNodeId = Math.max(nextNodeId, newState.nodes[i].id);
+                                        }
 
-                        }}>Delete edge</Button>
-                    <Button
-                        type="primary"
-                        disabled={getSelectNodes(state).length !== 2}
-                        onClick={() => {
+                                        nextNodeId++;
 
-                            clearResults(state);
+                                        setState(newState);
+                                    });
+                            }}><Button icon={<UploadOutlined/>}>Load from json</Button></Upload>
+                    </Space>
+                    <br/><br/>
+                    <Space>
+                        <Button
+                            type="primary"
+                            disabled={isBlock(state)}
+                            onClick={() => {
 
-                            const selectNodes = getSelectNodes(state);
+                                clearResults(state);
 
-                            const from = selectNodes[0];
-                            const to = selectNodes[1];
+                                if (!edgeWeigh) {
+                                    message.error("Edge weigh can't be empty.");
+                                    return;
+                                }
 
-                            let [pathLength, path] = calculate(state, parseInt(from.id), parseInt(to.id));
+                                debugger
 
-                            if (path.length === 0) {
-                                notification.warn(
+                                const selectNodes = getSelectNodes(state);
+
+                                const from = selectNodes[0];
+                                const to = selectNodes[1];
+
+                                let index = state.edges.findIndex(edge => (edge.from === from.id && edge.to === to.id) || (edge.to === from.id && edge.from === to.id));
+
+                                if (index >= 0) {
+                                    state.edges.splice(index, 1);
+                                }
+
+                                from.selectedAt = undefined;
+                                to.selectedAt = undefined;
+
+                                setState(JSON.parse(JSON.stringify(state)));
+
+                            }}>Delete edge</Button>
+                        <Button
+                            type="primary"
+                            disabled={getSelectNodes(state).length !== 2}
+                            onClick={() => {
+
+                                clearResults(state);
+
+                                const selectNodes = getSelectNodes(state);
+
+                                const from = selectNodes[0];
+                                const to = selectNodes[1];
+
+                                let [pathLength, path] = calculate(state, parseInt(from.id), parseInt(to.id));
+
+                                if (path.length === 0) {
+                                    notification.warn(
+                                        {
+                                            message: `Path from ${from.id} to ${to.id} doesn't exist.`,
+                                            duration: 1000000
+                                        }
+                                    )
+                                    return;
+                                }
+
+                                let textPath = `${path[path.length - 1].to}-${path[path.length - 1].from}`;
+                                for (let i = path.length - 2; i > -1; --i) {
+                                    textPath += `-${path[i].from}`;
+                                }
+
+                                notification.open(
                                     {
-                                        message: `Path from ${from.id} to ${to.id} doesn't exist.`,
+                                        message: `Short path from ${from.id} to ${to.id} was founded.`,
+                                        description: `Shortest path: ${textPath}\nPath length: ${pathLength}`,
                                         duration: 1000000
                                     }
                                 )
-                                return;
-                            }
 
-                            let textPath = `${path[path.length-1].to}-${path[path.length-1].from}`;
-                            for (let i = path.length - 2; i > -1; --i) {
-                                textPath += `-${path[i].from}`;
-                            }
+                                state.edges.forEach(edge => {
 
-                            notification.open(
-                                {
-                                    message: `Short path from ${from.id} to ${to.id} was founded.`,
-                                    description: `Shortest path: ${textPath}\nPath length: ${pathLength}`,
-                                    duration: 1000000
-                                }
-                            )
+                                    for (let i of path) {
 
-                            state.edges.forEach(edge => {
+                                        let from = parseInt(edge.from);
+                                        let to = parseInt(edge.to);
 
-                                for (let i of path) {
-
-                                    let from = parseInt(edge.from);
-                                    let to = parseInt(edge.to);
-
-                                    if ((i.from === from && i.to === to)
-                                        || (i.from === to && i.to === from)) {
-                                        edge.isPath = true;
+                                        if ((i.from === from && i.to === to)
+                                            || (i.from === to && i.to === from)) {
+                                            edge.isPath = true;
+                                        }
                                     }
-                                }
-                            })
+                                })
 
-                            isHaveResults = true;
+                                isHaveResults = true;
 
-                            setState(JSON.parse(JSON.stringify(state)));
+                                setState(JSON.parse(JSON.stringify(state)));
 
-                        }}>Find optimal path by "Dijkstra's algorithm"</Button>
-                </Space>
+                            }}>Find optimal path by "Dijkstra's algorithm"</Button>
+                    </Space>
+                    <br/><br/>
+                </div>
 
                 <ReactFlow
                     elements={getOutputStruct(state)}
