@@ -7,9 +7,11 @@ import {message, notification, Button, InputNumber, Space, Upload, Input, Card, 
 import 'antd/dist/antd.css';
 import {UploadOutlined} from '@ant-design/icons';
 import calculate from "./domains/DijkstraAlgorithm";
+import CustomEdge from "./domains/EdgeComponent";
 
 const red = "red";
 const gray = "gray";
+const brown = "brown";
 
 const nodeStyle = (color) => {
 
@@ -25,11 +27,13 @@ const nodeStyle = (color) => {
 
 const defaultNodeStyle = nodeStyle(gray);
 const selectedNodeStyle = nodeStyle(red);
+const pathNodeStyle = nodeStyle(brown);
 
 function createNode(id, x, y) {
 
     return {
         isDrag: false,
+        isPath: false,
         selectedAt: undefined,
         id: id.toString(),
         type: "special",
@@ -45,9 +49,8 @@ function createEdge(state, edge) {
         source: edge.from.toString(),
         target: edge.to.toString(),
         arrowHeadType: edge.isOriented ? ArrowHeadType.ArrowClosed : ArrowHeadType.Arrow ,
-        style: {stroke: edge.isPath ? "#FFF000" : "#000000"},
         label: edge.weigh,
-        data: state.edges
+        data: {isPath: edge.isPath}
     };
 }
 
@@ -58,6 +61,10 @@ function getOutputStruct(state) {
     for (const i in state.nodes) {
 
         state.nodes[i].style = defaultNodeStyle;
+
+        if (state.nodes[i].isPath) {
+            state.nodes[i].style = pathNodeStyle;
+        }
 
         if (state.nodes[i].selectedAt) {
             state.nodes[i].style = selectedNodeStyle;
@@ -75,7 +82,6 @@ function getOutputStruct(state) {
 
 let nextNodeId = 1;
 let userX = 0, userY = 0, userScale = 1;
-
 
 function getSelectNodes(state) {
 
@@ -126,9 +132,14 @@ let isHaveResults = false;
 function clearResults(state) {
 
     if (isHaveResults) {
+
         state.edges.forEach(edge => {
             edge.isPath = false;
         });
+
+        for (let i in state.nodes) {
+            state.nodes[i].isPath = false;
+        }
     }
 
     isHaveResults = false;
@@ -480,13 +491,15 @@ function App() {
 
                                 state.edges.forEach(edge => {
 
+                                    let from = parseInt(edge.from);
+                                    let to = parseInt(edge.to);
+
                                     for (let i of path) {
 
-                                        let from = parseInt(edge.from);
-                                        let to = parseInt(edge.to);
+                                        state.nodes[i.from].isPath = true;
+                                        state.nodes[i.to].isPath = true;
 
-                                        if ((i.from === from && i.to === to)
-                                            || (i.from === to && i.to === from)) {
+                                        if ((i.from === from && i.to === to)) {
                                             edge.isPath = true;
                                         }
                                     }
@@ -503,7 +516,7 @@ function App() {
 
                 <ReactFlow
                     elements={getOutputStruct(state)}
-                    edgeTypes={{default: EdgeComponent}}
+                    edgeTypes={{default: CustomEdge}}
                     nodeTypes={{special: NodeComponent}}
                     onNodeDrag={(e, node) => {
                         if (state.nodes[node.id]) {

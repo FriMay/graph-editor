@@ -67,7 +67,7 @@ function calculate(state, source, target) {
         }
 
         if (min === Infinity) {
-            return [-1, []];
+            break;
         }
 
         for (let i in edges[minEdge]) {
@@ -89,6 +89,10 @@ function calculate(state, source, target) {
 
     let result = [];
 
+    if (pathLength[target] === Infinity) {
+        return [-1, []];
+    }
+
     let i = target;
     while (true) {
 
@@ -96,7 +100,7 @@ function calculate(state, source, target) {
 
         if (nextEdge) {
 
-            result.push({from: i, to: nextEdge});
+            result.push({from: nextEdge, to: i});
 
             if (nextEdge === source) {
                 break;
