@@ -3,9 +3,10 @@ import ReactFlow from 'react-flow-renderer';
 import {useState} from "react";
 import EdgeComponent from "./domains/EdgeComponent";
 import NodeComponent from "./domains/NodeComponent";
-import {message, Button, InputNumber, Space, Upload} from 'antd';
+import {message, notification, Button, InputNumber, Space, Upload, Input, Card} from 'antd';
 import 'antd/dist/antd.css';
 import { UploadOutlined } from '@ant-design/icons';
+import calculate from "./domains/DijkstraAlgorithm";
 
 const red = "red";
 const gray = "gray";
@@ -29,20 +30,21 @@ function createNode(id, x, y) {
 
     return {
         isDrag: false,
+        selectedAt: undefined,
         id: id.toString(),
-        selected: false,
         type: "special",
         style: defaultNodeStyle,
         position: {x: x, y: y}
     };
 }
 
-function createEdge(from, to, weigh) {
+function createEdge(from, to, weigh, isPath = false) {
 
     return {
         id: `${from}-${to}`,
         source: from.toString(),
         target: to.toString(),
+        style: {stroke: isPath ? "#FFF000" : "#000000"},
         label: weigh
     };
 }
@@ -52,11 +54,18 @@ function getOutputStruct(state) {
     const elements = [];
 
     for (const i in state.nodes) {
+
+        state.nodes[i].style = defaultNodeStyle;
+
+        if (state.nodes[i].selectedAt) {
+            state.nodes[i].style = selectedNodeStyle;
+        }
+
         elements.push(state.nodes[i]);
     }
 
     for (const edge of state.edges) {
-        elements.push(createEdge(edge.from, edge.to, edge.weigh));
+        elements.push(createEdge(edge.from, edge.to, edge.weigh, edge.isPath));
     }
 
     return elements;
@@ -65,31 +74,61 @@ function getOutputStruct(state) {
 let nextNodeId = 1;
 let userX = 0, userY = 0, userScale = 1;
 
-function getSelectNodeIds(state) {
+function getSelectNodes(state) {
 
     const nodes = state.nodes;
 
-    const selectedIds = [];
+    const selected = [];
 
     for (const i in nodes) {
 
-        if (nodes[i] && nodes[i].selected) {
-            selectedIds.push(nodes[i].id);
+        if (nodes[i] && nodes[i].selectedAt) {
+            selected.push(nodes[i]);
         }
     }
 
-    return selectedIds;
+    selected.sort((a, b) => {
+
+        if (a.selectedAt > b.selectedAt) {
+            return 1;
+        }
+
+        return -1;
+    })
+
+    return selected;
 }
 
 function isBlock(state) {
 
-    let selectedIds = getSelectNodeIds(state);
+    let selected = getSelectNodes(state);
 
-    if (selectedIds.length !== 2) {
+    if (selected.length !== 2) {
         return true;
     }
 
-    return state[`${selectedIds[0]}-${selectedIds[1]}`] || state[`${selectedIds[1]}-${selectedIds[0]}`];
+    for (let edge of state.edges) {
+
+        if ((edge.from === selected[0].id && edge.to === selected[1].id)
+            || (edge.from === selected[1].id && edge.to === selected[0].id)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+let isHaveResults = false;
+
+function clearResults(state) {
+
+    if (isHaveResults) {
+        state.edges.forEach(edge => {
+            edge.isPath = false;
+        });
+    }
+
+    isHaveResults = false;
 }
 
 function App() {
@@ -98,9 +137,8 @@ function App() {
         nodes: {},
         edges: []
     });
-    const [edgeWeigh, setEdgeWeigh] = useState(null);
-
-    debugger;
+    const [edgeWeigh, setEdgeWeigh] = useState(1);
+    const [shortestPath, setShortestPath] = useState("asd");
 
     return (
         <>
@@ -113,6 +151,12 @@ function App() {
                 <Space>
                     <Button type="primary" onClick={() => {
 
+                        clearResults(state);
+
+                        getSelectNodes(state).forEach(node => {
+                            node.selectedAt = undefined;
+                        })
+
                         const nodes = state.nodes;
 
                         nodes[nextNodeId] = createNode(nextNodeId++, (-userX + (window.innerWidth / 2) - 300)/userScale, (-userY + (window.innerHeight / 2) - 200)/userScale);
@@ -121,32 +165,111 @@ function App() {
                     }}>Add Node</Button>
                     <Button
                         type="primary"
-                        disabled={isBlock(state)}
+                        disabled={getSelectNodes(state).length === 0}
                         onClick={() => {
+
+                            clearResults(state);
+
+                            const selectNodes = getSelectNodes(state);
+
+                            selectNodes.forEach(node => {
+
+                                delete state.nodes[node.id];
+
+                                while (true) {
+
+                                    let index = state.edges.findIndex(a => a.from === node.id || a.to === node.id);
+
+                                    if (index < 0) {
+                                        break;
+                                    }
+
+                                    state.edges.splice(index, 1);
+                                }
+                            })
+
+                            let indexes = [];
+
+                            for (let i in state.nodes) {
+                                indexes.push(parseInt(i));
+                            }
+
+                            indexes.sort((a, b) => {
+
+                                if (a === b) {
+                                    return 0;
+                                }
+
+                                if (a > b) {
+                                    return 1;
+                                }
+
+                                return 0;
+                            })
+
+                            for (let i = 0; i < indexes.length; ++i) {
+
+                                const node = state.nodes[indexes[i]];
+
+                                const oldNodeId = node.id;
+                                const newNodeId = (i + 1).toString();
+
+                                node.id = newNodeId;
+
+                                delete state.nodes[oldNodeId];
+
+                                state.nodes[newNodeId] = node;
+
+                                state.edges.forEach(edge => {
+
+                                    if (edge.from === oldNodeId) {
+                                        edge.from = newNodeId;
+                                    }
+
+                                    if (edge.to === oldNodeId) {
+                                        edge.to = newNodeId;
+                                    }
+                                })
+                            }
+
+                            nextNodeId = indexes.length + 1;
+
+                            setState(JSON.parse(JSON.stringify(state)));
+
+                    }}>Delete Nodes</Button>
+                    <Button
+                        type="primary"
+                        disabled={getSelectNodes(state).length !== 2}
+                        onClick={() => {
+
+                            clearResults(state);
 
                             if (!edgeWeigh) {
                                 message.error("Edge weigh can't be empty.");
                                 return;
                             }
 
-                            const nodes = state.nodes;
+                            debugger
 
-                            const selectedNodeIds = getSelectNodeIds(state);
+                            const selectNodes = getSelectNodes(state);
 
-                            const from = selectedNodeIds[0];
-                            const to = selectedNodeIds[1];
+                            const from = selectNodes[0];
+                            const to = selectNodes[1];
 
-                            state.edges.push({
-                                from: from,
-                                to: to,
-                                weigh: edgeWeigh
-                            });
+                            let edge = state.edges.find(edge => (edge.from === from.id && edge.to === to.id) || (edge.to === from.id && edge.from === to.id));
 
-                            nodes[from].selected = false;
-                            nodes[to].selected = false;
+                            if (edge) {
+                                edge.weigh = edgeWeigh;
+                            } else {
+                                state.edges.push({
+                                    from: from.id,
+                                    to: to.id,
+                                    weigh: edgeWeigh
+                                });
+                            }
 
-                            nodes[from].style = defaultNodeStyle;
-                            nodes[to].style = defaultNodeStyle
+                            from.selectedAt = undefined;
+                            to.selectedAt = undefined;
 
                             setState(JSON.parse(JSON.stringify(state)));
 
@@ -160,7 +283,19 @@ function App() {
                     />
                     <Button
                         type="primary"
+                        block={!isHaveResults}
                         onClick={() => {
+
+                            clearResults(state);
+
+                            setState(JSON.parse(JSON.stringify(state)));
+
+                        }}>Clear results</Button>
+                    <Button
+                        type="primary"
+                        onClick={() => {
+
+                            clearResults(state);
 
                             let text = "";
                             for (const edge of state.edges) {
@@ -187,6 +322,8 @@ function App() {
                         type="primary"
                         onClick={() => {
 
+                            clearResults(state);
+
                             const filename = "graph.json";
                             const blob = new Blob([JSON.stringify(state)], {type: 'text/plain'});
 
@@ -210,16 +347,159 @@ function App() {
                             file.text()
                                 .then(text => {
 
+                                    const newState = {
+                                        nodes: {},
+                                        edges: []
+                                    }
+
+                                    let x = window.innerWidth / 2
+                                    let y = window.innerHeight / 2
+
+                                    let isX = true;
+
+                                    for (const line of text.split("\n")) {
+
+                                        if (line.trim().length === 0) {
+                                            continue;
+                                        }
+
+                                        const parts = line.replace("\n", "").split(" ");
+
+                                        const from = parseInt(parts[0]);
+
+                                        const to = parseInt(parts[1]);
+
+                                        const weigh = parseInt(parts[2]);
+
+                                        newState.nodes[from] = createNode(from, x, y);
+                                        newState.nodes[to] = createNode(to, x - (isX ? 100 : 0), y - (!isX ? 100 : 0));
+                                        newState.edges.push({
+                                            from,
+                                            to,
+                                            weigh
+                                        });
+
+                                        nextNodeId = Math.max(from, to, nextNodeId);
+
+                                        if (isX) {
+                                            x += 100;
+                                        } else {
+                                            y += 100;
+                                        }
+
+                                        isX = !isX;
+                                    }
+
+                                    nextNodeId++;
+
+                                    setState(newState);
+                                });
+                        }}><Button icon={<UploadOutlined />}>Load from matrix</Button></Upload>
+                    <Upload
+                        showUploadList={false}
+                        beforeUpload={file => {
+
+                            file.text()
+                                .then(text => {
+
                                     const newState = JSON.parse(text);
 
                                     for (const i in newState.nodes) {
-                                        nextNodeId = Math.max(nextNodeId + 1, newState.nodes[i].id);
+                                        nextNodeId = Math.max(nextNodeId, newState.nodes[i].id);
                                     }
+
+                                    nextNodeId++;
 
                                     setState(newState);
                                 });
                         }}><Button icon={<UploadOutlined />}>Load from json</Button></Upload>
+                    <Button
+                        type="primary"
+                        disabled={isBlock(state)}
+                        onClick={() => {
 
+                            clearResults(state);
+
+                            if (!edgeWeigh) {
+                                message.error("Edge weigh can't be empty.");
+                                return;
+                            }
+
+                            debugger
+
+                            const selectNodes = getSelectNodes(state);
+
+                            const from = selectNodes[0];
+                            const to = selectNodes[1];
+
+                            let index = state.edges.findIndex(edge => (edge.from === from.id && edge.to === to.id) || (edge.to === from.id && edge.from === to.id));
+
+                            if (index >= 0) {
+                                state.edges.splice(index, 1);
+                            }
+
+                            from.selectedAt = undefined;
+                            to.selectedAt = undefined;
+
+                            setState(JSON.parse(JSON.stringify(state)));
+
+                        }}>Delete edge</Button>
+                    <Button
+                        type="primary"
+                        disabled={getSelectNodes(state).length !== 2}
+                        onClick={() => {
+
+                            clearResults(state);
+
+                            const selectNodes = getSelectNodes(state);
+
+                            const from = selectNodes[0];
+                            const to = selectNodes[1];
+
+                            let [pathLength, path] = calculate(state, parseInt(from.id), parseInt(to.id));
+
+                            if (path.length === 0) {
+                                notification.warn(
+                                    {
+                                        message: `Path from ${from.id} to ${to.id} doesn't exist.`,
+                                        duration: 1000000
+                                    }
+                                )
+                                return;
+                            }
+
+                            let textPath = `${path[path.length-1].to}-${path[path.length-1].from}`;
+                            for (let i = path.length - 2; i > -1; --i) {
+                                textPath += `-${path[i].from}`;
+                            }
+
+                            notification.open(
+                                {
+                                    message: `Short path from ${from.id} to ${to.id} was founded.`,
+                                    description: `Shortest path: ${textPath}\nPath length: ${pathLength}`,
+                                    duration: 1000000
+                                }
+                            )
+
+                            state.edges.forEach(edge => {
+
+                                for (let i of path) {
+
+                                    let from = parseInt(edge.from);
+                                    let to = parseInt(edge.to);
+
+                                    if ((i.from === from && i.to === to)
+                                        || (i.from === to && i.to === from)) {
+                                        edge.isPath = true;
+                                    }
+                                }
+                            })
+
+                            isHaveResults = true;
+
+                            setState(JSON.parse(JSON.stringify(state)));
+
+                        }}>Find optimal path by "Dijkstra's algorithm"</Button>
                 </Space>
 
                 <ReactFlow
@@ -228,19 +508,29 @@ function App() {
                     nodeTypes={{special: NodeComponent}}
                     onNodeDrag={(e, node) => {
                         if (state.nodes[node.id]) {
-                            debugger;
                             state.nodes[node.id].position.x = node.position.x;
                             state.nodes[node.id].position.y = node.position.y;
                         }
                     }}
                     onNodeDoubleClick={(e, node) => {
 
+                        let selectNodes = getSelectNodes(state);
+
+                        const selectNode = selectNodes.find((a) => a.id === node.id);
+
+                        if (selectNodes.length > 1 && !selectNode) {
+                            return;
+                        }
+
                         let elem = state.nodes[node.id];
                         if (elem) {
 
-                            elem.selected = !elem.selected;
+                            if (selectNode) {
+                                elem.selectedAt = undefined;
+                            } else {
+                                elem.selectedAt = Date.now();
+                            }
 
-                            elem.style = elem.selected ? selectedNodeStyle : defaultNodeStyle;
                             setState(JSON.parse(JSON.stringify(state)));
                         }
                     }}

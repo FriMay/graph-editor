@@ -1,7 +1,7 @@
 import {StraightEdge} from "react-flow-renderer";
 
 const EdgeComponent = (
-    { id, source, target, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, label, style }
+    { id, source, target, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, label, style },
 ) => {
 
     return (
