@@ -1,5 +1,5 @@
 import './App.css';
-import ReactFlow from 'react-flow-renderer';
+import ReactFlow, {ArrowHeadType} from 'react-flow-renderer';
 import {useState} from "react";
 import EdgeComponent from "./domains/EdgeComponent";
 import NodeComponent from "./domains/NodeComponent";
@@ -38,14 +38,16 @@ function createNode(id, x, y) {
     };
 }
 
-function createEdge(from, to, weigh, isPath = false) {
+function createEdge(state, edge) {
 
     return {
-        id: `${from}-${to}`,
-        source: from.toString(),
-        target: to.toString(),
-        style: {stroke: isPath ? "#FFF000" : "#000000"},
-        label: weigh
+        id: `${edge.from}-${edge.to}`,
+        source: edge.from.toString(),
+        target: edge.to.toString(),
+        arrowHeadType: edge.isOriented ? ArrowHeadType.ArrowClosed : ArrowHeadType.Arrow ,
+        style: {stroke: edge.isPath ? "#FFF000" : "#000000"},
+        label: edge.weigh,
+        data: state.edges
     };
 }
 
@@ -65,7 +67,7 @@ function getOutputStruct(state) {
     }
 
     for (const edge of state.edges) {
-        elements.push(createEdge(edge.from, edge.to, edge.weigh, edge.isPath));
+        elements.push(createEdge(state, edge));
     }
 
     return elements;
@@ -73,6 +75,7 @@ function getOutputStruct(state) {
 
 let nextNodeId = 1;
 let userX = 0, userY = 0, userScale = 1;
+
 
 function getSelectNodes(state) {
 
@@ -249,22 +252,22 @@ function App() {
                                     return;
                                 }
 
-                                debugger
-
                                 const selectNodes = getSelectNodes(state);
 
                                 const from = selectNodes[0];
                                 const to = selectNodes[1];
 
-                                let edge = state.edges.find(edge => (edge.from === from.id && edge.to === to.id) || (edge.to === from.id && edge.from === to.id));
+                                let edge = state.edges.find(edge => (edge.from === from.id && edge.to === to.id));
 
                                 if (edge) {
                                     edge.weigh = edgeWeigh;
+                                    edge.isOriented = true;
                                 } else {
                                     state.edges.push({
                                         from: from.id,
                                         to: to.id,
-                                        weigh: edgeWeigh
+                                        weigh: edgeWeigh,
+                                        isOriented: true
                                     });
                                 }
 
@@ -273,7 +276,7 @@ function App() {
 
                                 setState(JSON.parse(JSON.stringify(state)));
 
-                            }}>Make Edge</Button>
+                            }}>Make oriented Edge</Button>
                         <InputNumber
                             min={1}
                             value={edgeWeigh}
@@ -281,6 +284,35 @@ function App() {
                             placeholder="Edge Weigh"
                             style={{width: '115px'}}
                         />
+                        <Button
+                            type="primary"
+                            disabled={isBlock(state)}
+                            onClick={() => {
+
+                                clearResults(state);
+
+                                if (!edgeWeigh) {
+                                    message.error("Edge weigh can't be empty.");
+                                    return;
+                                }
+
+                                const selectNodes = getSelectNodes(state);
+
+                                const from = selectNodes[0];
+                                const to = selectNodes[1];
+
+                                let index = state.edges.findIndex(edge => (edge.from === from.id && edge.to === to.id) || (edge.to === from.id && edge.from === to.id));
+
+                                if (index >= 0) {
+                                    state.edges.splice(index, 1);
+                                }
+
+                                from.selectedAt = undefined;
+                                to.selectedAt = undefined;
+
+                                setState(JSON.parse(JSON.stringify(state)));
+
+                            }}>Delete edge</Button>
                     </Space>
                     <br/><br/>
                     <Space>
@@ -411,37 +443,6 @@ function App() {
                     <Space>
                         <Button
                             type="primary"
-                            disabled={isBlock(state)}
-                            onClick={() => {
-
-                                clearResults(state);
-
-                                if (!edgeWeigh) {
-                                    message.error("Edge weigh can't be empty.");
-                                    return;
-                                }
-
-                                debugger
-
-                                const selectNodes = getSelectNodes(state);
-
-                                const from = selectNodes[0];
-                                const to = selectNodes[1];
-
-                                let index = state.edges.findIndex(edge => (edge.from === from.id && edge.to === to.id) || (edge.to === from.id && edge.from === to.id));
-
-                                if (index >= 0) {
-                                    state.edges.splice(index, 1);
-                                }
-
-                                from.selectedAt = undefined;
-                                to.selectedAt = undefined;
-
-                                setState(JSON.parse(JSON.stringify(state)));
-
-                            }}>Delete edge</Button>
-                        <Button
-                            type="primary"
                             disabled={getSelectNodes(state).length !== 2}
                             onClick={() => {
 
@@ -539,6 +540,7 @@ function App() {
                         userY = e.y;
                         userScale = e.zoom;
                     }}
+                    props={state}
                 />
             </div>
         </>

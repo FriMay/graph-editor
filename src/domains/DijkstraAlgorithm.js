@@ -33,7 +33,9 @@ function calculate(state, source, target) {
         }
 
         edges[from][to] = weigh;
-        edges[to][from] = weigh;
+        if (!edge.isOriented) {
+            edges[to][from] = weigh;
+        }
 
         p[from] = source;
         p[to] = source;
