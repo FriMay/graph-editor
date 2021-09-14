@@ -512,6 +512,8 @@ function App() {
                     }}
                     onNodeDoubleClick={(e, node) => {
 
+                        clearResults(state);
+
                         let selectNodes = getSelectNodes(state);
 
                         const selectNode = selectNodes.find((a) => a.id === node.id);
