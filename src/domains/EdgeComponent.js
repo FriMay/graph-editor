@@ -1,7 +1,5 @@
 import {ArrowHeadType, StraightEdge} from "react-flow-renderer";
 
-let isRight = false;
-
 const EdgeComponent = (
     { id, source, target, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, label, style, arrowHeadType, data }
 ) => {
@@ -27,11 +25,6 @@ const EdgeComponent = (
 
     const isX = sourceCenterX > targetCenterX;
     const isY = sourceCenterY > targetCenterY;
-
-    isRight = !isRight;
-
-    xDif += isRight ? 10 : -10;
-    yDif += isRight ? 10 : -10;
 
     return (
         <StraightEdge
