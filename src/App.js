@@ -1,13 +1,14 @@
 import './App.css';
 import ReactFlow, {ArrowHeadType} from 'react-flow-renderer';
 import {useState} from "react";
-import EdgeComponent from "./domains/EdgeComponent";
 import NodeComponent from "./domains/NodeComponent";
-import {message, notification, Button, InputNumber, Space, Upload, Input, Card, Divider} from 'antd';
+import {message, notification, Button, InputNumber, Space, Upload, Input} from 'antd';
 import 'antd/dist/antd.css';
 import {UploadOutlined} from '@ant-design/icons';
 import calculate from "./domains/DijkstraAlgorithm";
 import CustomEdge from "./domains/EdgeComponent";
+
+const { TextArea } = Input;
 
 const red = "red";
 const gray = "gray";
@@ -42,15 +43,15 @@ function createNode(id, x, y) {
     };
 }
 
-function createEdge(state, edge) {
+function createEdge(edge, isOriented, isShowPath) {
 
     return {
         id: `${edge.from}-${edge.to}`,
         source: edge.from.toString(),
         target: edge.to.toString(),
-        arrowHeadType: edge.isOriented ? ArrowHeadType.ArrowClosed : ArrowHeadType.Arrow ,
+        arrowHeadType: ArrowHeadType.ArrowClosed,
         label: edge.weigh,
-        data: {isPath: edge.isPath}
+        data: {isPath: edge.isPath, isOriented: isOriented, isShowPath}
     };
 }
 
@@ -58,12 +59,19 @@ function getOutputStruct(state) {
 
     const elements = [];
 
+    let isShowPath = state.edges.find(a => a.isPath) !== undefined;
+
     for (const i in state.nodes) {
 
         state.nodes[i].style = defaultNodeStyle;
 
-        if (state.nodes[i].isPath) {
-            state.nodes[i].style = pathNodeStyle;
+        if (isShowPath) {
+
+            if (state.nodes[i].isPath) {
+                state.nodes[i].style = pathNodeStyle;
+            } else {
+                state.nodes[i].style = nodeStyle("rgba(185,185,185,0.24)");
+            }
         }
 
         if (state.nodes[i].selectedAt) {
@@ -73,8 +81,24 @@ function getOutputStruct(state) {
         elements.push(state.nodes[i]);
     }
 
+    let isEdgeAdded = {};
     for (const edge of state.edges) {
-        elements.push(createEdge(state, edge));
+
+        const key = `${edge.from}-${edge.to}`;
+        if (isEdgeAdded[key]) {
+            continue;
+        }
+
+        isEdgeAdded[key] = true;
+
+        let nonOrientedEdge = state.edges.find(a => a.weigh === edge.weigh && a.from === edge.to && a.to === edge.from);
+
+        if (nonOrientedEdge) {
+            isEdgeAdded[`${nonOrientedEdge.from}-${nonOrientedEdge.to}`] = true;
+            edge.isPath = edge.isPath || nonOrientedEdge.isPath;
+        }
+
+        elements.push(createEdge(edge, !nonOrientedEdge, isShowPath));
     }
 
     return elements;
@@ -127,22 +151,108 @@ function isBlock(state) {
     return true;
 }
 
-let isHaveResults = false;
-
 function clearResults(state) {
 
-    if (isHaveResults) {
+    state.edges.forEach(edge => {
+        edge.isPath = false;
+    });
 
-        state.edges.forEach(edge => {
-            edge.isPath = false;
-        });
+    for (let i in state.nodes) {
+        state.nodes[i].isPath = false;
+    }
+}
 
-        for (let i in state.nodes) {
-            state.nodes[i].isPath = false;
-        }
+function getStateFromMatrix(currentState, text) {
+
+    const newState = {
+        nodes: {},
+        edges: []
     }
 
-    isHaveResults = false;
+    let x = window.innerWidth / 2
+    let y = window.innerHeight / 2
+
+    let isX = true;
+
+    nextNodeId = 0;
+
+    let i = 1;
+    for (const line of text.split("\n")) {
+
+        if (line.trim().length === 0) {
+            continue;
+        }
+
+        const parts = line.trim().replace("\n", "").split(" ");
+        if (parts.length !== 3) {
+            continue;
+        }
+
+        const from = parseInt(parts[0]);
+
+        const to = parseInt(parts[1]);
+
+        const weigh = parseInt(parts[2]);
+
+        if (isNaN(from) || from < 0) {
+            message.error(`Error when parse matrix in line ${i} (${line}). First argument should be positive number.`);
+            return;
+        }
+
+        if (isNaN(to) || to < 0) {
+            message.error(`Error when parse matrix in line ${i} (${line}). Second argument should be positive number.`);
+            return;
+        }
+
+        if (isNaN(weigh) || weigh < 0) {
+            message.error(`Error when parse matrix in line ${i} (${line}). Third argument should be positive number.`);
+            return;
+        }
+
+        if (from === to) {
+            message.error(`Error when parse matrix in line ${i} (${line}). First and second argument can't be equals.`)
+            return;
+        }
+
+        if (newState.edges.find(a => a.from === parts[0] && a.to === parts[1])) {
+            message.error(`Error when parse matrix in line ${i} (${line}). Edge ${from}-${to} already exist.`);
+            return;
+        }
+
+        newState.nodes[from] = currentState.nodes[from] || createNode(from, x, y);
+        newState.nodes[to] = currentState.nodes[to] || createNode(to, newState.nodes[from].position.x - 60, newState.nodes[from].position.y - 60);
+
+        newState.edges.push({
+            from: parts[0],
+            to: parts[1],
+            weigh
+        });
+
+        nextNodeId = Math.max(from, to, nextNodeId);
+
+        if (isX) {
+            x += 100;
+        } else {
+            y += 100;
+        }
+
+        isX = !isX;
+        i++;
+    }
+
+    nextNodeId++;
+
+    return newState;
+}
+
+function getTextFromState(state) {
+
+    let text = "";
+    for (const edge of state.edges) {
+        text += `${edge.from} ${edge.to} ${edge.weigh}\n`;
+    }
+
+    return text;
 }
 
 function App() {
@@ -152,6 +262,7 @@ function App() {
         edges: []
     });
     const [edgeWeigh, setEdgeWeigh] = useState(1);
+    const [matrixValue, setMatrixValue] = useState("");
 
     return (
         <>
@@ -162,6 +273,20 @@ function App() {
                 height: "100%"
             }}>
                 <div style={{background: "rgba(217,255,147,0.66)"}}>
+                    <TextArea style={{ zIndex: 1000, width:"300px", height: "160px", position: 'absolute', right: '0px'}}
+                              value={matrixValue}
+                              onChange={(text) => {
+
+                                  let newState = getStateFromMatrix(state, text.target.value);
+
+                                  if (newState) {
+                                      clearResults(state);
+                                      setState(newState);
+                                  }
+
+                                  setMatrixValue(text.target.value);
+                              }}
+                    />
                     <Space>
                         <Button type="primary" onClick={() => {
 
@@ -248,6 +373,7 @@ function App() {
 
                                 nextNodeId = indexes.length + 1;
 
+                                setMatrixValue(getTextFromState(state));
                                 setState(JSON.parse(JSON.stringify(state)));
 
                             }}>Delete Nodes</Button>
@@ -272,19 +398,18 @@ function App() {
 
                                 if (edge) {
                                     edge.weigh = edgeWeigh;
-                                    edge.isOriented = true;
                                 } else {
                                     state.edges.push({
                                         from: from.id,
                                         to: to.id,
-                                        weigh: edgeWeigh,
-                                        isOriented: true
+                                        weigh: edgeWeigh
                                     });
                                 }
 
                                 from.selectedAt = undefined;
                                 to.selectedAt = undefined;
 
+                                setMatrixValue(getTextFromState(state));
                                 setState(JSON.parse(JSON.stringify(state)));
 
                             }}>Make oriented Edge</Button>
@@ -321,6 +446,7 @@ function App() {
                                 from.selectedAt = undefined;
                                 to.selectedAt = undefined;
 
+                                setMatrixValue(getTextFromState(state));
                                 setState(JSON.parse(JSON.stringify(state)));
 
                             }}>Delete edge</Button>
@@ -333,10 +459,7 @@ function App() {
 
                                 clearResults(state);
 
-                                let text = "";
-                                for (const edge of state.edges) {
-                                    text += `${edge.from} ${edge.to} ${edge.weigh}\n`;
-                                }
+                                let text = getTextFromState(state);
 
                                 const filename = "matrix.txt";
                                 const blob = new Blob([text], {type: 'text/plain'});
@@ -383,52 +506,11 @@ function App() {
                                 file.text()
                                     .then(text => {
 
-                                        const newState = {
-                                            nodes: {},
-                                            edges: []
+                                        let newState = getStateFromMatrix(state, text);
+
+                                        if (newState) {
+                                            setState(newState);
                                         }
-
-                                        let x = window.innerWidth / 2
-                                        let y = window.innerHeight / 2
-
-                                        let isX = true;
-
-                                        for (const line of text.split("\n")) {
-
-                                            if (line.trim().length === 0) {
-                                                continue;
-                                            }
-
-                                            const parts = line.replace("\n", "").split(" ");
-
-                                            const from = parseInt(parts[0]);
-
-                                            const to = parseInt(parts[1]);
-
-                                            const weigh = parseInt(parts[2]);
-
-                                            newState.nodes[from] = createNode(from, x, y);
-                                            newState.nodes[to] = createNode(to, x - (isX ? 100 : 0), y - (!isX ? 100 : 0));
-                                            newState.edges.push({
-                                                from,
-                                                to,
-                                                weigh
-                                            });
-
-                                            nextNodeId = Math.max(from, to, nextNodeId);
-
-                                            if (isX) {
-                                                x += 100;
-                                            } else {
-                                                y += 100;
-                                            }
-
-                                            isX = !isX;
-                                        }
-
-                                        nextNodeId++;
-
-                                        setState(newState);
                                     });
                             }}><Button icon={<UploadOutlined/>}>Load from matrix</Button></Upload>
                         <Upload
@@ -470,7 +552,8 @@ function App() {
                                     notification.warn(
                                         {
                                             message: `Path from ${from.id} to ${to.id} doesn't exist.`,
-                                            duration: 1000000
+                                            duration: 1000000,
+                                            placement: 'bottomRight'
                                         }
                                     )
                                     return;
@@ -485,6 +568,7 @@ function App() {
                                     {
                                         message: `Short path from ${from.id} to ${to.id} was founded.`,
                                         description: `Shortest path: ${textPath}\nPath length: ${pathLength}`,
+                                        placement: 'bottomRight',
                                         duration: 1000000
                                     }
                                 )
@@ -504,8 +588,6 @@ function App() {
                                         }
                                     }
                                 })
-
-                                isHaveResults = true;
 
                                 setState(JSON.parse(JSON.stringify(state)));
 

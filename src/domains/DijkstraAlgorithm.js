@@ -33,9 +33,6 @@ function calculate(state, source, target) {
         }
 
         edges[from][to] = weigh;
-        if (!edge.isOriented) {
-            edges[to][from] = weigh;
-        }
 
         p[from] = source;
         p[to] = source;
@@ -115,8 +112,5 @@ function calculate(state, source, target) {
 
     return [pathLength[target], result];
 }
-
-
-
 
 export default calculate;
