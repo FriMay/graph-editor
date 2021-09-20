@@ -83,7 +83,6 @@ export default function CustomEdge({
                 x={x}
                 y={y}
                 style={{
-                    zIndex: data.isPath ? 100000 : 999,
                     background: "rgba(71,34,34,0)",
                     color: color
                 }}

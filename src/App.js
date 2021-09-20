@@ -559,9 +559,9 @@ function App() {
                                     return;
                                 }
 
-                                let textPath = `${path[path.length - 1].to}-${path[path.length - 1].from}`;
+                                let textPath = `${path[path.length - 1].from}-${path[path.length - 1].to}`;
                                 for (let i = path.length - 2; i > -1; --i) {
-                                    textPath += `-${path[i].from}`;
+                                    textPath += `-${path[i].to}`;
                                 }
 
                                 notification.open(
