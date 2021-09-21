@@ -437,7 +437,7 @@ function App() {
                                 const from = selectNodes[0];
                                 const to = selectNodes[1];
 
-                                let index = state.edges.findIndex(edge => (edge.from === from.id && edge.to === to.id) || (edge.to === from.id && edge.from === to.id));
+                                let index = state.edges.findIndex(edge => (edge.from === from.id && edge.to === to.id));
 
                                 if (index >= 0) {
                                     state.edges.splice(index, 1);
@@ -546,12 +546,28 @@ function App() {
                                 const from = selectNodes[0];
                                 const to = selectNodes[1];
 
-                                let [pathLength, path] = calculate(state, parseInt(from.id), parseInt(to.id));
+                                window.performance.mark('dijkstra-start');
+                                console.time("start");
+
+                                let start = window.performance.now();
+
+                                let [pathLength, path] = calculate(JSON.parse(JSON.stringify(state)), parseInt(from.id), parseInt(to.id));
+
+                                window.performance.mark('dijkstra-end');
+                                window.performance.measure('dijkstra', 'dijkstra-start', 'dijkstra-end');
+
+                                let measures = window.performance.getEntriesByType('measure');
+
+                                let algoEnt = window.performance.now() - start;
+
+                                let end = measures[measures.length - 1].duration;
+
+                                console.timeEnd("start");
 
                                 if (path.length === 0) {
                                     notification.warn(
                                         {
-                                            message: `Path from ${from.id} to ${to.id} doesn't exist.`,
+                                            message: `Path from ${from.id} to ${to.id} doesn't exist. Answered by ${end} millis.`,
                                             duration: 1000000,
                                             placement: 'bottomRight'
                                         }
@@ -566,7 +582,7 @@ function App() {
 
                                 notification.open(
                                     {
-                                        message: `Short path from ${from.id} to ${to.id} was founded.`,
+                                        message: `Short path from ${from.id} to ${to.id} was founded by ${algoEnt} millis.`,
                                         description: `Shortest path: ${textPath}\nPath length: ${pathLength}`,
                                         placement: 'bottomRight',
                                         duration: 1000000
@@ -592,6 +608,11 @@ function App() {
                                 setState(JSON.parse(JSON.stringify(state)));
 
                             }}>Find optimal path by "Dijkstra's algorithm"</Button>
+                        <Button
+                            type="primary"
+                            disabled={getSelectNodes(state).length !== 2}
+                            onClick={() => {
+                            }}>Find optimal path by "Floyd's algorithm"</Button>
                     </Space>
                     <br/><br/>
                 </div>
