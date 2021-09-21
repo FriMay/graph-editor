@@ -11,7 +11,9 @@ function isAllWalked(isWalked) {
     return true;
 }
 
-function calculate(state, source, target) {
+function calculateDijkstra(state, source) {
+
+    const from = parseInt(source);
 
     const edges = {};
 
@@ -86,31 +88,40 @@ function calculate(state, source, target) {
 
     let result = [];
 
-    if (pathLength[target] === Infinity) {
-        return [-1, []];
-    }
+    let shortPaths = [];
+    for (let id in state.nodes) {
 
-    let i = target;
-    while (true) {
+        let to = parseInt(id);
 
-        let nextEdge = p[i];
+        let length = pathLength[to];
 
-        if (nextEdge) {
+        if (from === to || length === Infinity) {
+            continue;
+        }
 
-            result.push({from: nextEdge, to: i});
+        let path = [];
 
-            if (nextEdge === source) {
+        path.push(from);
+
+        let i = to;
+        while ((i = p[i])) {
+
+            if (i === from) {
                 break;
             }
 
-            i = nextEdge;
-        } else {
-            result = [];
-            break;
+            path.push(i);
         }
+
+        path.push(to);
+
+        shortPaths.push({
+            path,
+            length
+        })
     }
 
-    return [pathLength[target], result];
+    return shortPaths;
 }
 
-export default calculate;
+export default calculateDijkstra;

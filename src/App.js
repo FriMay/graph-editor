@@ -5,8 +5,9 @@ import NodeComponent from "./domains/NodeComponent";
 import {message, notification, Button, InputNumber, Space, Upload, Input} from 'antd';
 import 'antd/dist/antd.css';
 import {UploadOutlined} from '@ant-design/icons';
-import calculate from "./domains/DijkstraAlgorithm";
+import calculateDijkstra from "./domains/DijkstraAlgorithm";
 import CustomEdge from "./domains/EdgeComponent";
+import calculateFloyd from "./domains/FloydAlgorithm";
 
 const { TextArea } = Input;
 
@@ -263,6 +264,101 @@ function App() {
     });
     const [edgeWeigh, setEdgeWeigh] = useState(1);
     const [matrixValue, setMatrixValue] = useState("");
+
+    const calculateByFunc = (func, markPrefix) => {
+
+        const selectNodes = getSelectNodes(state);
+
+        const from = parseInt(selectNodes[0].id);
+        const to = parseInt(selectNodes[1].id);
+
+        const testCnt = 1000;
+        performance.mark(`${markPrefix}-start`)
+
+        let paths;
+
+        for (let i = 0; i < testCnt; ++i) {
+            paths = func(state, from, to);
+        }
+
+        performance.mark(`${markPrefix}-end`)
+        performance.measure(`${markPrefix}`, `${markPrefix}-start`, `${markPrefix}-end`)
+
+        let measures = performance.getEntriesByType("measure");
+
+        let end = (measures[measures.length - 1].duration / testCnt);
+
+        return [paths, end];
+    }
+
+    const calc = (func, markPrefix) => {
+
+        clearResults(state);
+
+        const selectNodes = getSelectNodes(state);
+
+        const from = parseInt(selectNodes[0].id);
+        const to = parseInt(selectNodes[1].id);
+
+        let [paths, time] = calculateByFunc(func, markPrefix);
+
+        let shortPath = paths.find(a => a.path[0] === from && a.path[a.path.length - 1] === to);
+
+        if (!shortPath) {
+            notification.warn(
+                {
+                    message: `Path from ${from} to ${to} doesn't exist. Answered by ${time} millis.`,
+                    duration: 1000000,
+                    placement: 'bottomRight'
+                }
+            )
+            return;
+        }
+
+        let path = shortPath.path;
+
+        let edges = [];
+
+        let first = path[0];
+        let textPath = `${path[0]}`;
+        for (let i = 1; i < path.length; ++i) {
+
+            let second = path[i];
+
+            textPath += `-${second}`;
+
+            edges.push({from: first, to: second});
+
+            first = second;
+        }
+
+        notification.open(
+            {
+                message: `Short path ${markPrefix} from ${from} to ${to} was founded by ${time} millis.`,
+                description: `Shortest path: ${textPath}. Path length: ${shortPath.length}`,
+                placement: 'bottomRight',
+                duration: 1000000
+            }
+        )
+
+        state.edges.forEach(stateEdge => {
+
+            let from = parseInt(stateEdge.from);
+            let to = parseInt(stateEdge.to);
+
+            for (let edge of edges) {
+
+                state.nodes[edge.from].isPath = true;
+                state.nodes[edge.to].isPath = true;
+
+                if ((edge.from === from && edge.to === to)) {
+                    stateEdge.isPath = true;
+                }
+            }
+        })
+
+        setState(JSON.parse(JSON.stringify(state)));
+    }
 
     return (
         <>
@@ -539,82 +635,23 @@ function App() {
                             disabled={getSelectNodes(state).length !== 2}
                             onClick={() => {
 
-                                clearResults(state);
+                                calc(calculateDijkstra, 'Dijkstra');
 
-                                const selectNodes = getSelectNodes(state);
-
-                                const from = selectNodes[0];
-                                const to = selectNodes[1];
-
-
-                                const testCnt = 1000;
-                                performance.mark("dijkstra-start")
-                                console.time("dijkstra");
-
-                                let pathLength, path;
-
-                                for (let i = 0; i < testCnt; ++i) {
-                                    [pathLength, path] = calculate(JSON.parse(JSON.stringify(state)), parseInt(from.id), parseInt(to.id));
-                                }
-
-                                console.timeEnd("dijkstra");
-
-                                performance.mark("dijkstra-end")
-                                performance.measure("dijkstra", "dijkstra-start", "dijkstra-end")
-
-                                let measures = performance.getEntriesByType("measure");
-
-                                let end = (measures[measures.length - 1].duration/testCnt);
-
-                                if (path.length === 0) {
-                                    notification.warn(
-                                        {
-                                            message: `Path from ${from.id} to ${to.id} doesn't exist.  Answered by ${end} millis.`,
-                                            duration: 1000000,
-                                            placement: 'bottomRight'
-                                        }
-                                    )
-                                    return;
-                                }
-
-                                let textPath = `${path[path.length - 1].from}-${path[path.length - 1].to}`;
-                                for (let i = path.length - 2; i > -1; --i) {
-                                    textPath += `-${path[i].to}`;
-                                }
-
-                                notification.open(
-                                    {
-                                        message: `Short path from ${from.id} to ${to.id} was founded by ${end} millis.`,
-                                        description: `Shortest path: ${textPath}. Path length: ${pathLength}`,
-                                        placement: 'bottomRight',
-                                        duration: 1000000
-                                    }
-                                )
-
-                                state.edges.forEach(edge => {
-
-                                    let from = parseInt(edge.from);
-                                    let to = parseInt(edge.to);
-
-                                    for (let i of path) {
-
-                                        state.nodes[i.from].isPath = true;
-                                        state.nodes[i.to].isPath = true;
-
-                                        if ((i.from === from && i.to === to)) {
-                                            edge.isPath = true;
-                                        }
-                                    }
-                                })
-
-                                setState(JSON.parse(JSON.stringify(state)));
-
-                            }}>Find optimal path by "Dijkstra's algorithm"</Button>
+                            }}>Find optimal path by "Dijkstra's" algorithm</Button>
                         <Button
                             type="primary"
                             disabled={getSelectNodes(state).length !== 2}
                             onClick={() => {
-                            }}>Find optimal path by "Floyd's algorithm"</Button>
+
+                                calc(calculateFloyd, 'Floyd');
+
+                            }}>Find optimal path by "Floyd's" algorithm</Button>
+                        <Button
+                            type="primary"
+                            disabled={getSelectNodes(state).length !== 2}
+                            onClick={() => {
+
+                            }}>Compare "Dijkstra" and "Floyd" algorithms</Button>
                     </Space>
                     <br/><br/>
                 </div>
