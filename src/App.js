@@ -546,28 +546,30 @@ function App() {
                                 const from = selectNodes[0];
                                 const to = selectNodes[1];
 
-                                window.performance.mark('dijkstra-start');
-                                console.time("start");
 
-                                let start = window.performance.now();
+                                const testCnt = 1000;
+                                performance.mark("dijkstra-start")
+                                console.time("dijkstra");
 
-                                let [pathLength, path] = calculate(JSON.parse(JSON.stringify(state)), parseInt(from.id), parseInt(to.id));
+                                let pathLength, path;
 
-                                window.performance.mark('dijkstra-end');
-                                window.performance.measure('dijkstra', 'dijkstra-start', 'dijkstra-end');
+                                for (let i = 0; i < testCnt; ++i) {
+                                    [pathLength, path] = calculate(JSON.parse(JSON.stringify(state)), parseInt(from.id), parseInt(to.id));
+                                }
 
-                                let measures = window.performance.getEntriesByType('measure');
+                                console.timeEnd("dijkstra");
 
-                                let algoEnt = window.performance.now() - start;
+                                performance.mark("dijkstra-end")
+                                performance.measure("dijkstra", "dijkstra-start", "dijkstra-end")
 
-                                let end = measures[measures.length - 1].duration;
+                                let measures = performance.getEntriesByType("measure");
 
-                                console.timeEnd("start");
+                                let end = (measures[measures.length - 1].duration/testCnt);
 
                                 if (path.length === 0) {
                                     notification.warn(
                                         {
-                                            message: `Path from ${from.id} to ${to.id} doesn't exist. Answered by ${end} millis.`,
+                                            message: `Path from ${from.id} to ${to.id} doesn't exist.  Answered by ${end} millis.`,
                                             duration: 1000000,
                                             placement: 'bottomRight'
                                         }
@@ -582,8 +584,8 @@ function App() {
 
                                 notification.open(
                                     {
-                                        message: `Short path from ${from.id} to ${to.id} was founded by ${algoEnt} millis.`,
-                                        description: `Shortest path: ${textPath}\nPath length: ${pathLength}`,
+                                        message: `Short path from ${from.id} to ${to.id} was founded by ${end} millis.`,
+                                        description: `Shortest path: ${textPath}. Path length: ${pathLength}`,
                                         placement: 'bottomRight',
                                         duration: 1000000
                                     }
