@@ -108,8 +108,6 @@ function calculateFloyd(state, source) {
         })
     }
 
-    debugger;
-
     return shortPaths;
 }
 

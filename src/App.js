@@ -2,7 +2,7 @@ import './App.css';
 import ReactFlow, {ArrowHeadType} from 'react-flow-renderer';
 import {useState} from "react";
 import NodeComponent from "./domains/NodeComponent";
-import {message, notification, Button, InputNumber, Space, Upload, Input} from 'antd';
+import {message, notification, Button, InputNumber, Space, Upload, Input, Modal, Divider} from 'antd';
 import 'antd/dist/antd.css';
 import {UploadOutlined} from '@ant-design/icons';
 import calculateDijkstra from "./domains/DijkstraAlgorithm";
@@ -256,6 +256,26 @@ function getTextFromState(state) {
     return text;
 }
 
+function getTextPath(path) {
+
+    let edges = [];
+
+    let first = path[0];
+    let textPath = `${path[0]}`;
+    for (let i = 1; i < path.length; ++i) {
+
+        let second = path[i];
+
+        textPath += `-${second}`;
+
+        edges.push({from: first, to: second});
+
+        first = second;
+    }
+
+    return [edges, textPath];
+}
+
 function App() {
 
     const [state, setState] = useState({
@@ -264,13 +284,15 @@ function App() {
     });
     const [edgeWeigh, setEdgeWeigh] = useState(1);
     const [matrixValue, setMatrixValue] = useState("");
+    const [isModalVisible, setIsModalVisible] = useState(false);
 
     const calculateByFunc = (func, markPrefix) => {
 
         const selectNodes = getSelectNodes(state);
 
+        debugger;
+
         const from = parseInt(selectNodes[0].id);
-        const to = parseInt(selectNodes[1].id);
 
         const testCnt = 1000;
         performance.mark(`${markPrefix}-start`)
@@ -278,7 +300,7 @@ function App() {
         let paths;
 
         for (let i = 0; i < testCnt; ++i) {
-            paths = func(state, from, to);
+            paths = func(state, from);
         }
 
         performance.mark(`${markPrefix}-end`)
@@ -317,20 +339,7 @@ function App() {
 
         let path = shortPath.path;
 
-        let edges = [];
-
-        let first = path[0];
-        let textPath = `${path[0]}`;
-        for (let i = 1; i < path.length; ++i) {
-
-            let second = path[i];
-
-            textPath += `-${second}`;
-
-            edges.push({from: first, to: second});
-
-            first = second;
-        }
+        let [edges, textPath] = getTextPath(path);
 
         notification.open(
             {
@@ -358,6 +367,27 @@ function App() {
         })
 
         setState(JSON.parse(JSON.stringify(state)));
+    }
+
+    const compare = () => {
+
+        let dijkstraIterator = 1;
+        let floydIterator = 1;
+
+        let [dijkstraPaths, dijkstraTime] = calculateByFunc(calculateDijkstra, "Dijkstra");
+        let [floydPaths, floydTime] = calculateByFunc(calculateFloyd, "Floyd");
+
+        return <>
+            <p>Dijkstra Result: {dijkstraTime} ms.</p>
+            {dijkstraPaths.map(shortPath => {
+                return <p>{dijkstraIterator++}) {getTextPath(shortPath.path)[1]}. Length: {shortPath.length}</p>;
+            })}
+            <Divider/>
+            <p>Floyd Result: {floydTime} ms.</p>
+            {floydPaths.map(shortPath => {
+                return <p>{floydIterator++}) {getTextPath(shortPath.path)[1]}. Length: {shortPath.length}</p>;
+            })}
+            </>;
     }
 
     return (
@@ -648,10 +678,18 @@ function App() {
                             }}>Find optimal path by "Floyd's" algorithm</Button>
                         <Button
                             type="primary"
-                            disabled={getSelectNodes(state).length !== 2}
+                            disabled={getSelectNodes(state).length !== 1}
                             onClick={() => {
 
+                                setIsModalVisible(true);
+
                             }}>Compare "Dijkstra" and "Floyd" algorithms</Button>
+                        <Modal title="Comparison"
+                               visible={isModalVisible}
+                               onOk={() => setIsModalVisible(false)}
+                               onCancel={() => setIsModalVisible(false)}>
+                            {(getSelectNodes(state).length === 1) && isModalVisible ? compare() : <></>}
+                        </Modal>
                     </Space>
                     <br/><br/>
                 </div>
