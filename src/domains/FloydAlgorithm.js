@@ -93,14 +93,14 @@ function calculateFloyd(state, source) {
 
         let path = [];
 
-        path.push(from);
+        path.unshift(j);
 
         let x = j;
         while ((x = p[from][x]) !== from) {
-            path.push(x);
+            path.unshift(x);
         }
 
-        path.push(j);
+        path.unshift(from);
 
         shortPaths.push({
             path,

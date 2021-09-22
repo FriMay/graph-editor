@@ -86,8 +86,6 @@ function calculateDijkstra(state, source) {
         isWalked[minEdge] = true;
     }
 
-    let result = [];
-
     let shortPaths = [];
     for (let id in state.nodes) {
 
@@ -101,7 +99,7 @@ function calculateDijkstra(state, source) {
 
         let path = [];
 
-        path.push(from);
+        path.unshift(to);
 
         let i = to;
         while ((i = p[i])) {
@@ -110,10 +108,10 @@ function calculateDijkstra(state, source) {
                 break;
             }
 
-            path.push(i);
+            path.unshift(i);
         }
 
-        path.push(to);
+        path.unshift(from);
 
         shortPaths.push({
             path,

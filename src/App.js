@@ -2,7 +2,7 @@ import './App.css';
 import ReactFlow, {ArrowHeadType} from 'react-flow-renderer';
 import {useState} from "react";
 import NodeComponent from "./domains/NodeComponent";
-import {message, notification, Button, InputNumber, Space, Upload, Input, Modal, Divider} from 'antd';
+import {message, notification, Button, InputNumber, Space, Upload, Input, Modal, Divider, Card, Col, Row} from 'antd';
 import 'antd/dist/antd.css';
 import {UploadOutlined} from '@ant-design/icons';
 import calculateDijkstra from "./domains/DijkstraAlgorithm";
@@ -378,15 +378,23 @@ function App() {
         let [floydPaths, floydTime] = calculateByFunc(calculateFloyd, "Floyd");
 
         return <>
-            <p>Dijkstra Result: {dijkstraTime} ms.</p>
-            {dijkstraPaths.map(shortPath => {
-                return <p>{dijkstraIterator++}) {getTextPath(shortPath.path)[1]}. Length: {shortPath.length}</p>;
-            })}
-            <Divider/>
-            <p>Floyd Result: {floydTime} ms.</p>
-            {floydPaths.map(shortPath => {
-                return <p>{floydIterator++}) {getTextPath(shortPath.path)[1]}. Length: {shortPath.length}</p>;
-            })}
+                <Row gutter={36}>
+                    <Col span={10}>
+                        <Card title={`Dijkstra Result: ${dijkstraTime} ms.`} bordered={false}>
+                            {dijkstraPaths.map(shortPath => {
+                                return <p>{dijkstraIterator++}) {getTextPath(shortPath.path)[1]}. Length: {shortPath.length}</p>;
+                            })}
+                        </Card>
+                    </Col>
+
+                    <Col span={10}>
+                        <Card title={`Floyd Result: ${floydTime} ms.`} bordered={false}>
+                            {floydPaths.map(shortPath => {
+                                return <p>{floydIterator++}) {getTextPath(shortPath.path)[1]}. Length: {shortPath.length}</p>;
+                            })}
+                        </Card>
+                    </Col>
+                </Row>
             </>;
     }
 
@@ -687,6 +695,7 @@ function App() {
                         <Modal title="Comparison"
                                visible={isModalVisible}
                                onOk={() => setIsModalVisible(false)}
+                               width={1100}
                                onCancel={() => setIsModalVisible(false)}>
                             {(getSelectNodes(state).length === 1) && isModalVisible ? compare() : <></>}
                         </Modal>
