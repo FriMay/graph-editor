@@ -5,7 +5,7 @@ import NodeComponent from "./domains/NodeComponent";
 import {message, notification, Button, InputNumber, Space, Upload, Input, Modal, Divider, Card, Col, Row} from 'antd';
 import 'antd/dist/antd.css';
 import {UploadOutlined} from '@ant-design/icons';
-import calculateDijkstra from "./domains/DijkstraAlgorithm";
+import calculateDijkstra, {calculateAll} from "./domains/DijkstraAlgorithm";
 import CustomEdge from "./domains/EdgeComponent";
 import calculateFloyd from "./domains/FloydAlgorithm";
 
@@ -290,9 +290,7 @@ function App() {
 
         const selectNodes = getSelectNodes(state);
 
-        debugger;
-
-        const from = parseInt(selectNodes[0].id);
+        const from = selectNodes.length > 0 ? parseInt(selectNodes[0].id) : undefined;
 
         const testCnt = 1000;
         performance.mark(`${markPrefix}-start`)
@@ -374,7 +372,9 @@ function App() {
         let dijkstraIterator = 1;
         let floydIterator = 1;
 
-        let [dijkstraPaths, dijkstraTime] = calculateByFunc(calculateDijkstra, "Dijkstra");
+        debugger;
+
+        let [dijkstraPaths, dijkstraTime] = calculateByFunc(calculateAll, "Dijkstra");
         let [floydPaths, floydTime] = calculateByFunc(calculateFloyd, "Floyd");
 
         return <>
@@ -686,7 +686,7 @@ function App() {
                             }}>Find optimal path by "Floyd's" algorithm</Button>
                         <Button
                             type="primary"
-                            disabled={getSelectNodes(state).length !== 1}
+                            disabled={getSelectNodes(state).length !== 0 || state.edges.length === 0}
                             onClick={() => {
 
                                 setIsModalVisible(true);
@@ -697,7 +697,7 @@ function App() {
                                onOk={() => setIsModalVisible(false)}
                                width={1100}
                                onCancel={() => setIsModalVisible(false)}>
-                            {(getSelectNodes(state).length === 1) && isModalVisible ? compare() : <></>}
+                            {(getSelectNodes(state).length === 0 && state.edges.length !== 0) && isModalVisible ? compare() : <></>}
                         </Modal>
                     </Space>
                     <br/><br/>

@@ -1,7 +1,5 @@
 
-function calculateFloyd(state, source) {
-
-    let from = parseInt(source);
+function calculateFloyd(state) {
 
     const d = {};
     const p = {};
@@ -79,33 +77,38 @@ function calculateFloyd(state, source) {
 
     let shortPaths = [];
 
-    for (let j = 1; j <= n; ++j) {
+    for (let i in state.nodes) {
 
-        if (j === from) {
-            continue;
+        let from = parseInt(i);
+
+        for (let j = 1; j <= n; ++j) {
+
+            if (j === from) {
+                continue;
+            }
+
+            if (!d[from][j] || d[from][j] === Infinity) {
+                continue;
+            }
+
+            let length = d[from][j];
+
+            let path = [];
+
+            path.unshift(j);
+
+            let x = j;
+            while ((x = p[from][x]) !== from) {
+                path.unshift(x);
+            }
+
+            path.unshift(from);
+
+            shortPaths.push({
+                path,
+                length
+            })
         }
-
-        if (!d[from][j] || d[from][j] === Infinity) {
-            continue;
-        }
-
-        let length = d[from][j];
-
-        let path = [];
-
-        path.unshift(j);
-
-        let x = j;
-        while ((x = p[from][x]) !== from) {
-            path.unshift(x);
-        }
-
-        path.unshift(from);
-
-        shortPaths.push({
-            path,
-            length
-        })
     }
 
     return shortPaths;

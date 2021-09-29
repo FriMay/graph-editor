@@ -122,4 +122,17 @@ function calculateDijkstra(state, source) {
     return shortPaths;
 }
 
+export function calculateAll(state) {
+
+    let result = [];
+
+    for (let i in state.nodes) {
+        for (let shortPath of calculateDijkstra(state, parseInt(i))) {
+            result.push(shortPath);
+        }
+    }
+
+    return result;
+}
+
 export default calculateDijkstra;
