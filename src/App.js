@@ -75,6 +75,10 @@ function getOutputStruct(state) {
             }
         }
 
+        if (state.nodes[i].isAnimate) {
+            state.nodes[i].style = pathNodeStyle;
+        }
+
         if (state.nodes[i].selectedAt) {
             state.nodes[i].style = selectedNodeStyle;
         }
@@ -160,6 +164,7 @@ function clearResults(state) {
 
     for (let i in state.nodes) {
         state.nodes[i].isPath = false;
+        state.nodes[i].isAnimate = false;
     }
 }
 
@@ -276,6 +281,7 @@ function getTextPath(path) {
     return [edges, textPath];
 }
 
+let isStop = false;
 function App() {
 
     const [state, setState] = useState({
@@ -285,6 +291,7 @@ function App() {
     const [edgeWeigh, setEdgeWeigh] = useState(1);
     const [matrixValue, setMatrixValue] = useState("");
     const [isModalVisible, setIsModalVisible] = useState(false);
+    const [isAnimation, setIsAnimation] = useState(false);
 
     const calculateByFunc = (func, markPrefix) => {
 
@@ -372,8 +379,6 @@ function App() {
         let dijkstraIterator = 1;
         let floydIterator = 1;
 
-        debugger;
-
         let [dijkstraPaths, dijkstraTime] = calculateByFunc(calculateAll, "Dijkstra");
         let [floydPaths, floydTime] = calculateByFunc(calculateFloyd, "Floyd");
 
@@ -396,6 +401,10 @@ function App() {
                     </Col>
                 </Row>
             </>;
+    }
+
+    function sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 
     return (
@@ -692,6 +701,57 @@ function App() {
                                 setIsModalVisible(true);
 
                             }}>Compare "Dijkstra" and "Floyd" algorithms</Button>
+                        <Button
+                            type="primary"
+                            disabled={getSelectNodes(state).length !== 1 || isAnimation}
+                            onClick={async () => {
+
+                                setIsAnimation(true);
+
+                                getSelectNodes(state)[0].selectedAt = undefined;
+
+                                clearResults(state);
+
+                                setState(JSON.parse(JSON.stringify(state)));
+
+                                do {
+                                    for (let i in state.nodes) {
+
+                                        if (isStop) {
+                                            break;
+                                        }
+
+                                        await sleep(300);
+
+                                        state.nodes[i].isAnimate = true;
+                                        setState(JSON.parse(JSON.stringify(state)));
+
+                                        if (isStop) {
+                                            break;
+                                        }
+
+                                        await sleep(300);
+
+                                        state.nodes[i].isAnimate = false;
+
+                                        setState(JSON.parse(JSON.stringify(state)));
+                                    }
+                                } while (!isStop);
+
+                                isStop = false;
+                                setIsAnimation(false);
+
+                                clearResults(state);
+
+                                setState(JSON.parse(JSON.stringify(state)));
+
+                            }}>Animate</Button>
+                        <Button
+                            type="primary"
+                            disabled={!isAnimation}
+                            onClick={() => {
+                                isStop = true;
+                            }}>Stop</Button>
                         <Modal title="Comparison"
                                visible={isModalVisible}
                                onOk={() => setIsModalVisible(false)}
