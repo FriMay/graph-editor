@@ -2,7 +2,21 @@ import './App.css';
 import ReactFlow, {ArrowHeadType} from 'react-flow-renderer';
 import {useState} from "react";
 import NodeComponent from "./domains/NodeComponent";
-import {message, notification, Button, InputNumber, Space, Upload, Input, Modal, Divider, Card, Col, Row} from 'antd';
+import {
+    message,
+    notification,
+    Button,
+    InputNumber,
+    Space,
+    Upload,
+    Input,
+    Modal,
+    Divider,
+    Card,
+    Col,
+    Row,
+    Slider
+} from 'antd';
 import 'antd/dist/antd.css';
 import {UploadOutlined} from '@ant-design/icons';
 import calculateDijkstra, {calculateAll} from "./domains/DijkstraAlgorithm";
@@ -56,11 +70,11 @@ function createEdge(edge, isOriented, isShowPath) {
     };
 }
 
-function getOutputStruct(state) {
+function getOutputStruct(state, isAnimation) {
 
     const elements = [];
 
-    let isShowPath = state.edges.find(a => a.isPath) !== undefined;
+    let isShowPath = state.edges.find(a => a.isPath) !== undefined || isAnimation;
 
     for (const i in state.nodes) {
 
@@ -77,10 +91,10 @@ function getOutputStruct(state) {
 
         if (state.nodes[i].isAnimate) {
             state.nodes[i].style = pathNodeStyle;
-        }
-
-        if (state.nodes[i].selectedAt) {
-            state.nodes[i].style = selectedNodeStyle;
+        } else {
+            if (state.nodes[i].selectedAt) {
+                state.nodes[i].style = selectedNodeStyle;
+            }
         }
 
         elements.push(state.nodes[i]);
@@ -111,62 +125,6 @@ function getOutputStruct(state) {
 
 let nextNodeId = 1;
 let userX = 0, userY = 0, userScale = 1;
-
-function getSelectNodes(state) {
-
-    const nodes = state.nodes;
-
-    const selected = [];
-
-    for (const i in nodes) {
-
-        if (nodes[i] && nodes[i].selectedAt) {
-            selected.push(nodes[i]);
-        }
-    }
-
-    selected.sort((a, b) => {
-
-        if (a.selectedAt > b.selectedAt) {
-            return 1;
-        }
-
-        return -1;
-    })
-
-    return selected;
-}
-
-function isBlock(state) {
-
-    let selected = getSelectNodes(state);
-
-    if (selected.length !== 2) {
-        return true;
-    }
-
-    for (let edge of state.edges) {
-
-        if ((edge.from === selected[0].id && edge.to === selected[1].id)
-            || (edge.from === selected[1].id && edge.to === selected[0].id)) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-function clearResults(state) {
-
-    state.edges.forEach(edge => {
-        edge.isPath = false;
-    });
-
-    for (let i in state.nodes) {
-        state.nodes[i].isPath = false;
-        state.nodes[i].isAnimate = false;
-    }
-}
 
 function getStateFromMatrix(currentState, text) {
 
@@ -281,6 +239,7 @@ function getTextPath(path) {
     return [edges, textPath];
 }
 
+let animationSpeed = 0;
 let isStop = false;
 function App() {
 
@@ -293,13 +252,71 @@ function App() {
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [isAnimation, setIsAnimation] = useState(false);
 
-    const calculateByFunc = (func, markPrefix) => {
+    const getSelectNodes = () => {
+        const nodes = state.nodes;
 
-        const selectNodes = getSelectNodes(state);
+        const selected = [];
+
+        for (const i in nodes) {
+
+            if (nodes[i] && nodes[i].selectedAt) {
+                selected.push(nodes[i]);
+            }
+        }
+
+        selected.sort((a, b) => {
+
+            if (a.selectedAt > b.selectedAt) {
+                return 1;
+            }
+
+            return -1;
+        })
+
+        return selected;
+    }
+
+    const isBlock = () => {
+
+        let selected = getSelectNodes();
+
+        if (selected.length !== 2) {
+            return true;
+        }
+
+        for (let edge of state.edges) {
+
+            if ((edge.from === selected[0].id && edge.to === selected[1].id)
+                || (edge.from === selected[1].id && edge.to === selected[0].id)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    const clearEdges = () => {
+        state.edges.forEach(edge => {
+            edge.isPath = false;
+        });
+    }
+
+    const clearResults = () => {
+
+        clearEdges();
+
+        for (let i in state.nodes) {
+            state.nodes[i].isPath = false;
+            state.nodes[i].isAnimate = false;
+        }
+    }
+
+    const calculateByFunc = (func, markPrefix, testCnt = 1000) => {
+
+        const selectNodes = getSelectNodes();
 
         const from = selectNodes.length > 0 ? parseInt(selectNodes[0].id) : undefined;
 
-        const testCnt = 1000;
         performance.mark(`${markPrefix}-start`)
 
         let paths;
@@ -318,11 +335,13 @@ function App() {
         return [paths, end];
     }
 
+    const updateState = newState => setState(JSON.parse(JSON.stringify(newState)));
+
     const calc = (func, markPrefix) => {
 
-        clearResults(state);
+        clearResults();
 
-        const selectNodes = getSelectNodes(state);
+        const selectNodes = getSelectNodes();
 
         const from = parseInt(selectNodes[0].id);
         const to = parseInt(selectNodes[1].id);
@@ -371,10 +390,22 @@ function App() {
             }
         })
 
-        setState(JSON.parse(JSON.stringify(state)));
+        updateState(state);
     }
 
-    const compare = () => {
+    const isPathExist = () => {
+
+        const selectNodes = getSelectNodes();
+
+        const from = parseInt(selectNodes[0].id);
+        const to = parseInt(selectNodes[1].id);
+
+        let [paths] = calculateByFunc(calculateDijkstra, "Dijkstra", 1);
+
+        return paths.find(a => a.path[0] === from && a.path[a.path.length - 1] === to && a.length);
+    }
+
+    const compareDijkstraAndFloyd = () => {
 
         let dijkstraIterator = 1;
         let floydIterator = 1;
@@ -403,8 +434,8 @@ function App() {
             </>;
     }
 
-    function sleep(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
+    const sleep = speed => {
+        return new Promise(resolve => setTimeout(resolve, 500/Math.pow(2, speed)));
     }
 
     return (
@@ -423,7 +454,7 @@ function App() {
                                   let newState = getStateFromMatrix(state, text.target.value);
 
                                   if (newState) {
-                                      clearResults(state);
+                                      clearResults();
                                       setState(newState);
                                   }
 
@@ -442,7 +473,7 @@ function App() {
                             const nodes = state.nodes;
 
                             nodes[nextNodeId] = createNode(nextNodeId++, (-userX + (window.innerWidth / 2) - 300) / userScale, (-userY + (window.innerHeight / 2) - 200) / userScale);
-                            setState(JSON.parse(JSON.stringify(state)));
+                            updateState(state);
 
                         }}>Add Node</Button>
                         <Button
@@ -450,9 +481,9 @@ function App() {
                             disabled={getSelectNodes(state).length === 0}
                             onClick={() => {
 
-                                clearResults(state);
+                                clearResults();
 
-                                const selectNodes = getSelectNodes(state);
+                                const selectNodes = getSelectNodes();
 
                                 selectNodes.forEach(node => {
 
@@ -517,7 +548,7 @@ function App() {
                                 nextNodeId = indexes.length + 1;
 
                                 setMatrixValue(getTextFromState(state));
-                                setState(JSON.parse(JSON.stringify(state)));
+                                updateState(state);
 
                             }}>Delete Nodes</Button>
                         <Button
@@ -525,14 +556,14 @@ function App() {
                             disabled={getSelectNodes(state).length !== 2}
                             onClick={() => {
 
-                                clearResults(state);
+                                clearResults();
 
                                 if (!edgeWeigh) {
                                     message.error("Edge weigh can't be empty.");
                                     return;
                                 }
 
-                                const selectNodes = getSelectNodes(state);
+                                const selectNodes = getSelectNodes();
 
                                 const from = selectNodes[0];
                                 const to = selectNodes[1];
@@ -553,7 +584,7 @@ function App() {
                                 to.selectedAt = undefined;
 
                                 setMatrixValue(getTextFromState(state));
-                                setState(JSON.parse(JSON.stringify(state)));
+                                updateState(state);
 
                             }}>Make oriented Edge</Button>
                         <InputNumber
@@ -590,7 +621,7 @@ function App() {
                                 to.selectedAt = undefined;
 
                                 setMatrixValue(getTextFromState(state));
-                                setState(JSON.parse(JSON.stringify(state)));
+                                updateState(state);
 
                             }}>Delete edge</Button>
                     </Space>
@@ -600,7 +631,7 @@ function App() {
                             type="primary"
                             onClick={() => {
 
-                                clearResults(state);
+                                clearResults();
 
                                 let text = getTextFromState(state);
 
@@ -701,70 +732,203 @@ function App() {
                                 setIsModalVisible(true);
 
                             }}>Compare "Dijkstra" and "Floyd" algorithms</Button>
+                        <Modal title="Comparison"
+                               visible={isModalVisible}
+                               onOk={() => setIsModalVisible(false)}
+                               width={1100}
+                               onCancel={() => setIsModalVisible(false)}>
+                            {(getSelectNodes(state).length === 0 && state.edges.length !== 0) && isModalVisible ? compareDijkstraAndFloyd() : <></>}
+                        </Modal>
+                    </Space>
+                    <br/><br/>
+                    <Space>
                         <Button
                             type="primary"
-                            disabled={getSelectNodes(state).length !== 1 || isAnimation}
+                            disabled={getSelectNodes(state).length !== 2 || isAnimation || !isPathExist()}
                             onClick={async () => {
 
                                 setIsAnimation(true);
 
-                                getSelectNodes(state)[0].selectedAt = undefined;
+                                let [sourceNode, targetNode] = getSelectNodes();
 
-                                clearResults(state);
+                                clearResults();
 
-                                setState(JSON.parse(JSON.stringify(state)));
+                                updateState(state);
 
-                                do {
-                                    for (let i in state.nodes) {
+                                let nextNode = sourceNode;
+                                let prevRandomEdge = undefined;
+                                let i = 0;
+                                while (nextNode.id !== targetNode.id) {
 
-                                        if (isStop) {
-                                            break;
-                                        }
-
-                                        await sleep(300);
-
-                                        state.nodes[i].isAnimate = true;
-                                        setState(JSON.parse(JSON.stringify(state)));
-
-                                        if (isStop) {
-                                            break;
-                                        }
-
-                                        await sleep(300);
-
-                                        state.nodes[i].isAnimate = false;
-
-                                        setState(JSON.parse(JSON.stringify(state)));
+                                    if (isStop) {
+                                        break;
                                     }
-                                } while (!isStop);
+
+                                    if (prevRandomEdge) {
+                                        prevRandomEdge.isPath = false;
+                                    }
+
+                                    nextNode.isAnimate = true;
+                                    updateState(state);
+
+                                    await sleep(animationSpeed);
+
+                                    let edges = state.edges.filter(a => a.from === nextNode.id);
+
+                                    if (!edges || edges.length === 0) {
+                                        message.error(`Edges from node ${nextNode.id} not found.`);
+                                        break;
+                                    }
+
+                                    prevRandomEdge = edges[Math.floor(Math.random() * edges.length)];
+
+                                    prevRandomEdge.isPath = true;
+
+                                    updateState(state);
+
+                                    await sleep(animationSpeed);
+
+                                    nextNode.isAnimate = false;
+
+                                    nextNode = state.nodes[prevRandomEdge.to];
+
+                                    i++;
+                                }
+
+                                if (nextNode.id === targetNode.id) {
+                                    notification.open(
+                                        {
+                                            message: `Package delivered from ${sourceNode.id} node to ${targetNode.id} node.`,
+                                            description: `Step count: ${i}`,
+                                            placement: 'bottomRight',
+                                            duration: 1000000
+                                        }
+                                    )
+                                }
 
                                 isStop = false;
                                 setIsAnimation(false);
 
                                 clearResults(state);
 
-                                setState(JSON.parse(JSON.stringify(state)));
+                                updateState(state);
 
-                            }}>Animate</Button>
+                            }}>Random routing (Virtual channel)</Button>
+                        <Button
+                            type="primary"
+                            disabled={getSelectNodes(state).length !== 2 || isAnimation || !isPathExist()}
+                            onClick={async () => {
+
+                                setIsAnimation(true);
+
+                                let [sourceNode, targetNode] = getSelectNodes();
+
+                                let isAnswerFound = false;
+                                let nextNodes = [{prevNode: undefined, currentNode: sourceNode}];
+                                let i = -1;
+                                while (true) {
+
+                                    i += nextNodes.length;
+
+                                    clearResults();
+
+                                    if (isStop) {
+                                        break;
+                                    }
+
+                                    if (nextNodes.find(a => a.currentNode.id === targetNode.id)) {
+                                        isAnswerFound = true;
+                                        break;
+                                    }
+
+                                    nextNodes.forEach(nextNode => {
+                                        nextNode.currentNode.isAnimate = true;
+                                    });
+
+                                    updateState(state);
+
+                                    await sleep(animationSpeed);
+
+                                    let newNextNodes = [];
+
+                                    nextNodes
+                                        .forEach(nextNode => {
+
+                                            let currentNode = nextNode.currentNode;
+
+                                            state.edges
+                                                .filter(node => {
+
+                                                    let isCurrent = node.from === currentNode.id;
+
+                                                    if (nextNode.prevNode) {
+                                                        return isCurrent && nextNode.prevNode.id !== node.to;
+                                                    }
+
+                                                    return isCurrent;
+                                                })
+                                                .forEach(edge => {
+
+                                                    edge.isPath = true;
+
+                                                    newNextNodes.push(
+                                                        {prevNode: currentNode, currentNode: state.nodes[edge.to]}
+                                                    );
+                                                });
+                                        })
+
+                                    nextNodes = newNextNodes;
+
+                                    updateState(state);
+
+                                    await sleep(animationSpeed);
+                                }
+
+                                if (isAnswerFound) {
+                                    notification.open(
+                                        {
+                                            message: `Package delivered from ${sourceNode.id} node to ${targetNode.id} node.`,
+                                            description: `Step count: ${i}`,
+                                            placement: 'bottomRight',
+                                            duration: 1000000
+                                        }
+                                    )
+                                }
+
+                                isStop = false;
+                                setIsAnimation(false);
+
+                                clearResults();
+
+                                updateState(state);
+
+                            }}>Avalanche routing (Virtual channel)</Button>
                         <Button
                             type="primary"
                             disabled={!isAnimation}
                             onClick={() => {
                                 isStop = true;
                             }}>Stop</Button>
-                        <Modal title="Comparison"
-                               visible={isModalVisible}
-                               onOk={() => setIsModalVisible(false)}
-                               width={1100}
-                               onCancel={() => setIsModalVisible(false)}>
-                            {(getSelectNodes(state).length === 0 && state.edges.length !== 0) && isModalVisible ? compare() : <></>}
-                        </Modal>
+                        <Slider
+                            marks={{
+                                0: "1x",
+                                1: "2x",
+                                2: "4x",
+                                3: "8x",
+                                4: "16x"
+                            }}
+                            min={0}
+                            max={4}
+                            tipFormatter={null}
+                            defaultValue={animationSpeed}
+                            onChange={(value) => animationSpeed = value}
+                            style={{width: "200px"}} />
                     </Space>
                     <br/><br/>
                 </div>
 
                 <ReactFlow
-                    elements={getOutputStruct(state)}
+                    elements={getOutputStruct(state, isAnimation)}
                     edgeTypes={{default: CustomEdge}}
                     nodeTypes={{special: NodeComponent}}
                     onNodeDrag={(e, node) => {
@@ -794,7 +958,7 @@ function App() {
                                 elem.selectedAt = Date.now();
                             }
 
-                            setState(JSON.parse(JSON.stringify(state)));
+                            updateState(state);
                         }
                     }}
                     onMove={e => {
