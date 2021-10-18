@@ -11,7 +11,6 @@ import {
     Upload,
     Input,
     Modal,
-    Divider,
     Card,
     Col,
     Row,
@@ -58,7 +57,8 @@ function createNode(id, x, y) {
     };
 }
 
-function createEdge(edge, isOriented, isShowPath) {
+let progressNums = 10;
+function createEdge(edge, isOriented, isShowPath, packets) {
 
     return {
         id: `${edge.from}-${edge.to}`,
@@ -66,15 +66,15 @@ function createEdge(edge, isOriented, isShowPath) {
         target: edge.to.toString(),
         arrowHeadType: ArrowHeadType.ArrowClosed,
         label: edge.weigh,
-        data: {isPath: edge.isPath, isOriented: isOriented, isShowPath}
+        data: {isPath: edge.isPath, isOriented: isOriented, isShowPath, packets: packets, progressNums}
     };
 }
 
-function getOutputStruct(state, isAnimation) {
+function getOutputStruct(state, packets = []) {
 
     const elements = [];
 
-    let isShowPath = state.edges.find(a => a.isPath) !== undefined || isAnimation;
+    let isShowPath = state.edges.find(a => a.isPath) !== undefined;
 
     for (const i in state.nodes) {
 
@@ -117,7 +117,7 @@ function getOutputStruct(state, isAnimation) {
             edge.isPath = edge.isPath || nonOrientedEdge.isPath;
         }
 
-        elements.push(createEdge(edge, !nonOrientedEdge, isShowPath));
+        elements.push(createEdge(edge, !nonOrientedEdge, isShowPath, packets));
     }
 
     return elements;
@@ -132,21 +132,17 @@ function getStateFromMatrix(currentState, text) {
         nodes: {},
         edges: []
     }
-
     let x = window.innerWidth / 2
     let y = window.innerHeight / 2
 
     let isX = true;
 
     nextNodeId = 0;
-
     let i = 1;
     for (const line of text.split("\n")) {
-
         if (line.trim().length === 0) {
             continue;
         }
-
         const parts = line.trim().replace("\n", "").split(" ");
         if (parts.length !== 3) {
             continue;
@@ -157,7 +153,6 @@ function getStateFromMatrix(currentState, text) {
         const to = parseInt(parts[1]);
 
         const weigh = parseInt(parts[2]);
-
         if (isNaN(from) || from < 0) {
             message.error(`Error when parse matrix in line ${i} (${line}). First argument should be positive number.`);
             return;
@@ -184,7 +179,8 @@ function getStateFromMatrix(currentState, text) {
         }
 
         newState.nodes[from] = currentState.nodes[from] || createNode(from, x, y);
-        newState.nodes[to] = currentState.nodes[to] || createNode(to, newState.nodes[from].position.x - 60, newState.nodes[from].position.y - 60);
+        newState.nodes[to] = currentState.nodes[to]
+            || createNode(to, newState.nodes[from].position.x - 60, newState.nodes[from].position.y - 60);
 
         newState.edges.push({
             from: parts[0],
@@ -199,30 +195,25 @@ function getStateFromMatrix(currentState, text) {
         } else {
             y += 100;
         }
-
         isX = !isX;
         i++;
     }
 
     nextNodeId++;
-
     return newState;
 }
 
 function getTextFromState(state) {
-
     let text = "";
     for (const edge of state.edges) {
         text += `${edge.from} ${edge.to} ${edge.weigh}\n`;
     }
-
     return text;
 }
 
 function getTextPath(path) {
 
     let edges = [];
-
     let first = path[0];
     let textPath = `${path[0]}`;
     for (let i = 1; i < path.length; ++i) {
@@ -232,13 +223,21 @@ function getTextPath(path) {
         textPath += `-${second}`;
 
         edges.push({from: first, to: second});
-
         first = second;
     }
-
     return [edges, textPath];
 }
 
+function getRandomColor() {
+    var letters = '0123456789ABCDEF';
+    var color = '#';
+    for (var i = 0; i < 6; i++) {
+        color += letters[Math.floor(Math.random() * letters.length)];
+    }
+    return color;
+}
+
+let packets = [];
 let animationSpeed = 0;
 let isStop = false;
 function App() {
@@ -253,6 +252,7 @@ function App() {
     const [isAnimation, setIsAnimation] = useState(false);
 
     const getSelectNodes = () => {
+
         const nodes = state.nodes;
 
         const selected = [];
@@ -302,6 +302,8 @@ function App() {
     }
 
     const clearResults = () => {
+
+        packets = [];
 
         clearEdges();
 
@@ -435,7 +437,7 @@ function App() {
     }
 
     const sleep = speed => {
-        return new Promise(resolve => setTimeout(resolve, 500/Math.pow(2, speed)));
+        return new Promise(resolve => setTimeout(resolve, 500 / Math.pow(2, speed)));
     }
 
     return (
@@ -755,51 +757,59 @@ function App() {
 
                                 updateState(state);
 
-                                let nextNode = sourceNode;
-                                let prevRandomEdge = undefined;
-                                let i = 0;
-                                while (nextNode.id !== targetNode.id) {
+                                packets.push({
+                                    from: sourceNode.id,
+                                    to: sourceNode.id,
+                                    progress: progressNums,
+                                    step: 0,
+                                    color: getRandomColor()
+                                });
 
-                                    if (isStop) {
+                                let packetFound = undefined;
+                                while (!packetFound && !isStop) {
+
+                                    for (let i = 0; i < packets.length; ++i) {
+
+                                        let packet = packets[i];
+
+                                        if (packet.progress === progressNums) {
+
+                                            if (packet.to === targetNode.id) {
+                                                packetFound = packet;
+                                                break;
+                                            }
+
+                                            packet.progress = 0;
+                                            packet.from = packet.to;
+                                            packet.step++;
+
+                                            const edges = state.edges.filter(a => a.from === packet.from);
+
+                                            if (edges.length === 0) {
+                                                isStop = true;
+                                                break;
+                                            }
+
+                                            packet.to = edges[Math.floor(Math.random() * edges.length)].to;
+                                        } else {
+                                            packet.progress++;
+                                        }
+                                    }
+
+                                    if (packetFound) {
                                         break;
                                     }
 
-                                    if (prevRandomEdge) {
-                                        prevRandomEdge.isPath = false;
-                                    }
-
-                                    nextNode.isAnimate = true;
                                     updateState(state);
 
                                     await sleep(animationSpeed);
-
-                                    let edges = state.edges.filter(a => a.from === nextNode.id);
-
-                                    if (!edges || edges.length === 0) {
-                                        message.error(`Edges from node ${nextNode.id} not found.`);
-                                        break;
-                                    }
-
-                                    prevRandomEdge = edges[Math.floor(Math.random() * edges.length)];
-
-                                    prevRandomEdge.isPath = true;
-
-                                    updateState(state);
-
-                                    await sleep(animationSpeed);
-
-                                    nextNode.isAnimate = false;
-
-                                    nextNode = state.nodes[prevRandomEdge.to];
-
-                                    i++;
                                 }
 
-                                if (nextNode.id === targetNode.id) {
+                                if (packetFound) {
                                     notification.open(
                                         {
                                             message: `Package delivered from ${sourceNode.id} node to ${targetNode.id} node.`,
-                                            description: `Step count: ${i}`,
+                                            description: `Step count: ${packetFound.step}`,
                                             placement: 'bottomRight',
                                             duration: 1000000
                                         }
@@ -823,72 +833,59 @@ function App() {
 
                                 let [sourceNode, targetNode] = getSelectNodes();
 
-                                let isAnswerFound = false;
-                                let nextNodes = [{prevNode: undefined, currentNode: sourceNode}];
-                                let i = -1;
-                                while (true) {
+                                let id = 0;
+                                packets.push({
+                                    id,
+                                    from: sourceNode.id,
+                                    to: sourceNode.id,
+                                    progress: progressNums,
+                                    step: 0,
+                                    color: getRandomColor(),
+                                });
 
-                                    i += nextNodes.length;
+                                let packetFound = undefined;
 
-                                    clearResults();
+                                while (!packetFound && !isStop) {
 
-                                    if (isStop) {
-                                        break;
-                                    }
+                                    for (let delivered of packets.filter(a => a.progress === progressNums)) {
 
-                                    if (nextNodes.find(a => a.currentNode.id === targetNode.id)) {
-                                        isAnswerFound = true;
-                                        break;
-                                    }
+                                        if (delivered.to === targetNode.id) {
+                                            packetFound = delivered;
+                                            break;
+                                        }
 
-                                    nextNodes.forEach(nextNode => {
-                                        nextNode.currentNode.isAnimate = true;
-                                    });
+                                        let color = getRandomColor();
 
-                                    updateState(state);
+                                        state.edges
+                                            .filter(edge => edge.from === delivered.to && edge.to !== delivered.from)
+                                            .forEach(nextEdge => {
 
-                                    await sleep(animationSpeed);
-
-                                    let newNextNodes = [];
-
-                                    nextNodes
-                                        .forEach(nextNode => {
-
-                                            let currentNode = nextNode.currentNode;
-
-                                            state.edges
-                                                .filter(node => {
-
-                                                    let isCurrent = node.from === currentNode.id;
-
-                                                    if (nextNode.prevNode) {
-                                                        return isCurrent && nextNode.prevNode.id !== node.to;
-                                                    }
-
-                                                    return isCurrent;
-                                                })
-                                                .forEach(edge => {
-
-                                                    edge.isPath = true;
-
-                                                    newNextNodes.push(
-                                                        {prevNode: currentNode, currentNode: state.nodes[edge.to]}
-                                                    );
+                                                debugger
+                                                packets.push({
+                                                    id: id++,
+                                                    from: delivered.to,
+                                                    to: nextEdge.to,
+                                                    progress: 0,
+                                                    step: delivered.step + 1,
+                                                    color
                                                 });
-                                        })
+                                            });
+                                    }
 
-                                    nextNodes = newNextNodes;
+                                    packets = packets.filter(a => a.progress !== progressNums);
+
+                                    packets.forEach(packet => packet.progress++);
 
                                     updateState(state);
 
                                     await sleep(animationSpeed);
                                 }
 
-                                if (isAnswerFound) {
+                                if (packetFound) {
                                     notification.open(
                                         {
                                             message: `Package delivered from ${sourceNode.id} node to ${targetNode.id} node.`,
-                                            description: `Step count: ${i}`,
+                                            description: `Step count: ${packetFound.step}`,
                                             placement: 'bottomRight',
                                             duration: 1000000
                                         }
@@ -928,7 +925,7 @@ function App() {
                 </div>
 
                 <ReactFlow
-                    elements={getOutputStruct(state, isAnimation)}
+                    elements={getOutputStruct(state, packets)}
                     edgeTypes={{default: CustomEdge}}
                     nodeTypes={{special: NodeComponent}}
                     onNodeDrag={(e, node) => {

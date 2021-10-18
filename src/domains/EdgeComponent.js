@@ -1,4 +1,5 @@
 import {getBezierPath, getMarkerEnd, getEdgeCenter} from 'react-flow-renderer';
+import {FolderOutlined} from "@ant-design/icons";
 
 export default function CustomEdge({
                                        id,
@@ -26,6 +27,27 @@ export default function CustomEdge({
 
     const isNonOriented = !data.isOriented;
 
+    let packets = [];
+
+    for (let packet of data.packets) {
+
+        if (packet.progress === 0) {
+            continue;
+        }
+
+        if (id === `${packet.from}-${packet.to}`) {
+            packets.push(packet);
+        }
+
+        if (!isNonOriented) {
+            continue;
+        }
+
+        if (id === `${packet.to}-${packet.from}`) {
+            packets.push(packet);
+        }
+    }
+
     let xDif = 0, yDif = 0;
     let x, y;
     if (!isNonOriented) {
@@ -50,6 +72,30 @@ export default function CustomEdge({
             targetX: targetCenterX,
             targetY: targetCenterY
         });
+    }
+
+    let xDifference = (sourceCenterX - targetCenterX) / data.progressNums;
+    let yDifference = (sourceCenterY - targetCenterY) / data.progressNums;
+
+    let from = id.split("-")[0];
+
+    let places = [];
+
+    for (let packet of packets) {
+
+        if (packet.from === from) {
+            places.push({
+                x: sourceCenterX - xDifference * packet.progress,
+                y: sourceCenterY - yDifference * packet.progress,
+                color: packet.color
+            });
+        } else {
+            places.push({
+                x: targetCenterX + xDifference * packet.progress,
+                y: targetCenterY + yDifference * packet.progress,
+                color: packet.color
+            })
+        }
     }
 
     const edgePath = getBezierPath({
@@ -90,6 +136,24 @@ export default function CustomEdge({
             >
                 {label}
             </foreignObject>
+
+            {
+                places.map(place => {
+                    return <foreignObject
+                        width={50}
+                        height={50}
+                        x={place.x}
+                        y={place.y}
+                        style={{
+                            background: "rgba(71,34,34,0)",
+                            color: place.color
+                        }}
+                        requiredExtensions="http://www.w3.org/1999/xhtml"
+                    >
+                        <FolderOutlined width={50} height={50} />
+                    </foreignObject>;
+                })
+            }
         </>
     );
 }
