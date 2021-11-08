@@ -74,8 +74,8 @@ export default function CustomEdge({
         });
     }
 
-    let xDifference = (sourceCenterX - targetCenterX) / data.progressNums;
-    let yDifference = (sourceCenterY - targetCenterY) / data.progressNums;
+    let xDifference = (sourceCenterX - targetCenterX) / (data.progressNums + 1);
+    let yDifference = (sourceCenterY - targetCenterY) / (data.progressNums + 1);
 
     let from = id.split("-")[0];
 
@@ -85,14 +85,14 @@ export default function CustomEdge({
 
         if (packet.from === from) {
             places.push({
-                x: sourceCenterX - xDifference * packet.progress,
-                y: sourceCenterY - yDifference * packet.progress,
+                x: sourceCenterX - xDifference * packet.progress - 5,
+                y: sourceCenterY - yDifference * packet.progress - 11,
                 color: packet.color
             });
         } else {
             places.push({
-                x: targetCenterX + xDifference * packet.progress,
-                y: targetCenterY + yDifference * packet.progress,
+                x: targetCenterX + xDifference * packet.progress - 5,
+                y: targetCenterY + yDifference * packet.progress - 11,
                 color: packet.color
             })
         }

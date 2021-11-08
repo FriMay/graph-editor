@@ -14,7 +14,8 @@ import {
     Card,
     Col,
     Row,
-    Slider
+    Slider,
+    Select
 } from 'antd';
 import 'antd/dist/antd.css';
 import {UploadOutlined} from '@ant-design/icons';
@@ -27,6 +28,8 @@ const { TextArea } = Input;
 const red = "red";
 const gray = "gray";
 const brown = "brown";
+
+const { Option } = Select;
 
 const nodeStyle = (color) => {
 
@@ -250,6 +253,10 @@ function App() {
     const [matrixValue, setMatrixValue] = useState("");
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [isAnimation, setIsAnimation] = useState(false);
+    const [method, setMethod] = useState("random");
+    const [channelType, setChannelType] = useState("virtual");
+    const [ttl, setTtl] = useState(100);
+    const [packetsCount, setPacketsCount] = useState(3);
 
     const getSelectNodes = () => {
 
@@ -744,162 +751,190 @@ function App() {
                     </Space>
                     <br/><br/>
                     <Space>
+                        <Select defaultValue={method} style={{ width: 200 }} onSelect={setMethod}>
+                            <Option value="random">Random routing</Option>
+                            <Option value="avalanche">Avalanche routing</Option>
+                            <Option value="adaptive">Adaptive routing</Option>
+                        </Select>
+                        <Select defaultValue={channelType}
+                                style={{ width: 200 }}
+                                onSelect={setChannelType}
+                                disabled={getSelectNodes(state).length !== 2 || isAnimation || !isPathExist() || method !== "adaptive"}>
+                            <Option value="virtual">Virtual channel</Option>
+                            <Option value="deitagramm">Deitagramm channel</Option>
+                        </Select>
+                        <InputNumber
+                            min={1}
+                            max={500}
+                            value={ttl}
+                            onChange={setTtl}
+                            placeholder="TTL"
+                            style={{width: '115px'}}
+                        />
+                        <InputNumber
+                            min={1}
+                            max={50}
+                            value={packetsCount}
+                            onChange={setPacketsCount}
+                            placeholder="Packet count"
+                            style={{width: '115px'}}
+                        />
+
                         <Button
                             type="primary"
                             disabled={getSelectNodes(state).length !== 2 || isAnimation || !isPathExist()}
                             onClick={async () => {
 
-                                setIsAnimation(true);
+                                if (method === "random") {
 
-                                let [sourceNode, targetNode] = getSelectNodes();
+                                    setIsAnimation(true);
 
-                                clearResults();
+                                    let [sourceNode, targetNode] = getSelectNodes();
 
-                                updateState(state);
-
-                                packets.push({
-                                    from: sourceNode.id,
-                                    to: sourceNode.id,
-                                    progress: progressNums,
-                                    step: 0,
-                                    color: getRandomColor()
-                                });
-
-                                let packetFound = undefined;
-                                while (!packetFound && !isStop) {
-
-                                    for (let i = 0; i < packets.length; ++i) {
-
-                                        let packet = packets[i];
-
-                                        if (packet.progress === progressNums) {
-
-                                            if (packet.to === targetNode.id) {
-                                                packetFound = packet;
-                                                break;
-                                            }
-
-                                            packet.progress = 0;
-                                            packet.from = packet.to;
-                                            packet.step++;
-
-                                            const edges = state.edges.filter(a => a.from === packet.from);
-
-                                            if (edges.length === 0) {
-                                                isStop = true;
-                                                break;
-                                            }
-
-                                            packet.to = edges[Math.floor(Math.random() * edges.length)].to;
-                                        } else {
-                                            packet.progress++;
-                                        }
-                                    }
-
-                                    if (packetFound) {
-                                        break;
-                                    }
+                                    clearResults();
 
                                     updateState(state);
 
-                                    await sleep(animationSpeed);
-                                }
+                                    packets.push({
+                                        from: sourceNode.id,
+                                        to: sourceNode.id,
+                                        progress: progressNums,
+                                        step: 0,
+                                        color: getRandomColor()
+                                    });
 
-                                if (packetFound) {
-                                    notification.open(
-                                        {
-                                            message: `Package delivered from ${sourceNode.id} node to ${targetNode.id} node.`,
-                                            description: `Step count: ${packetFound.step}`,
-                                            placement: 'bottomRight',
-                                            duration: 1000000
+                                    let packetFound = undefined;
+                                    while (!packetFound && !isStop) {
+
+                                        for (let i = 0; i < packets.length; ++i) {
+
+                                            let packet = packets[i];
+
+                                            if (packet.progress === progressNums) {
+
+                                                if (packet.to === targetNode.id) {
+                                                    packetFound = packet;
+                                                    break;
+                                                }
+
+                                                packet.progress = 0;
+                                                packet.from = packet.to;
+                                                packet.step++;
+
+                                                const edges = state.edges.filter(a => a.from === packet.from);
+
+                                                if (edges.length === 0) {
+                                                    isStop = true;
+                                                    break;
+                                                }
+
+                                                packet.to = edges[Math.floor(Math.random() * edges.length)].to;
+                                            } else {
+                                                packet.progress++;
+                                            }
                                         }
-                                    )
-                                }
 
-                                isStop = false;
-                                setIsAnimation(false);
-
-                                clearResults(state);
-
-                                updateState(state);
-
-                            }}>Random routing (Virtual channel)</Button>
-                        <Button
-                            type="primary"
-                            disabled={getSelectNodes(state).length !== 2 || isAnimation || !isPathExist()}
-                            onClick={async () => {
-
-                                setIsAnimation(true);
-
-                                let [sourceNode, targetNode] = getSelectNodes();
-
-                                let id = 0;
-                                packets.push({
-                                    id,
-                                    from: sourceNode.id,
-                                    to: sourceNode.id,
-                                    progress: progressNums,
-                                    step: 0,
-                                    color: getRandomColor(),
-                                });
-
-                                let packetFound = undefined;
-
-                                while (!packetFound && !isStop) {
-
-                                    for (let delivered of packets.filter(a => a.progress === progressNums)) {
-
-                                        if (delivered.to === targetNode.id) {
-                                            packetFound = delivered;
+                                        if (packetFound) {
                                             break;
                                         }
 
-                                        let color = getRandomColor();
+                                        updateState(state);
 
-                                        state.edges
-                                            .filter(edge => edge.from === delivered.to && edge.to !== delivered.from)
-                                            .forEach(nextEdge => {
-
-                                                debugger
-                                                packets.push({
-                                                    id: id++,
-                                                    from: delivered.to,
-                                                    to: nextEdge.to,
-                                                    progress: 0,
-                                                    step: delivered.step + 1,
-                                                    color
-                                                });
-                                            });
+                                        await sleep(animationSpeed);
                                     }
 
-                                    packets = packets.filter(a => a.progress !== progressNums);
+                                    if (packetFound) {
+                                        notification.open(
+                                            {
+                                                message: `Package delivered from ${sourceNode.id} node to ${targetNode.id} node.`,
+                                                description: `Step count: ${packetFound.step}`,
+                                                placement: 'bottomRight',
+                                                duration: 1000000
+                                            }
+                                        )
+                                    }
 
-                                    packets.forEach(packet => packet.progress++);
+                                    isStop = false;
+                                    setIsAnimation(false);
+
+                                    clearResults(state);
 
                                     updateState(state);
 
-                                    await sleep(animationSpeed);
-                                }
+                                } else if (method === "avalanche") {
 
-                                if (packetFound) {
-                                    notification.open(
-                                        {
-                                            message: `Package delivered from ${sourceNode.id} node to ${targetNode.id} node.`,
-                                            description: `Step count: ${packetFound.step}`,
-                                            placement: 'bottomRight',
-                                            duration: 1000000
+                                    setIsAnimation(true);
+
+                                    let [sourceNode, targetNode] = getSelectNodes();
+
+                                    let id = 0;
+                                    packets.push({
+                                        id,
+                                        from: sourceNode.id,
+                                        to: sourceNode.id,
+                                        progress: progressNums,
+                                        step: 0,
+                                        color: getRandomColor(),
+                                    });
+
+                                    let packetFound = undefined;
+
+                                    while (!packetFound && !isStop) {
+
+                                        for (let delivered of packets.filter(a => a.progress === progressNums)) {
+
+                                            if (delivered.to === targetNode.id) {
+                                                packetFound = delivered;
+                                                break;
+                                            }
+
+                                            let color = getRandomColor();
+
+                                            state.edges
+                                                .filter(edge => edge.from === delivered.to && edge.to !== delivered.from)
+                                                .forEach(nextEdge => {
+
+                                                    debugger
+                                                    packets.push({
+                                                        id: id++,
+                                                        from: delivered.to,
+                                                        to: nextEdge.to,
+                                                        progress: 0,
+                                                        step: delivered.step + 1,
+                                                        color
+                                                    });
+                                                });
                                         }
-                                    )
+
+                                        packets = packets.filter(a => a.progress !== progressNums);
+
+                                        packets.forEach(packet => packet.progress++);
+
+                                        updateState(state);
+
+                                        await sleep(animationSpeed);
+                                    }
+
+                                    if (packetFound) {
+                                        notification.open(
+                                            {
+                                                message: `Package delivered from ${sourceNode.id} node to ${targetNode.id} node.`,
+                                                description: `Step count: ${packetFound.step}`,
+                                                placement: 'bottomRight',
+                                                duration: 1000000
+                                            }
+                                        )
+                                    }
+
+                                    isStop = false;
+                                    setIsAnimation(false);
+
+                                    clearResults();
+
+                                    updateState(state);
                                 }
-
-                                isStop = false;
-                                setIsAnimation(false);
-
-                                clearResults();
-
-                                updateState(state);
-
-                            }}>Avalanche routing (Virtual channel)</Button>
+                            }}
+                        > Start </Button>
                         <Button
                             type="primary"
                             disabled={!isAnimation}
