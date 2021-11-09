@@ -27,7 +27,9 @@ export default function CustomEdge({
 
     const isNonOriented = !data.isOriented;
 
-    let packets = [];
+    let progressNums = 0;
+
+    let progressToPackets = {};
 
     for (let packet of data.packets) {
 
@@ -35,8 +37,17 @@ export default function CustomEdge({
             continue;
         }
 
+        if (packet.progress === packet.maxProgress) {
+            continue;
+        }
+
         if (id === `${packet.from}-${packet.to}`) {
-            packets.push(packet);
+
+            if (progressToPackets[packet.progress] === undefined) {
+                progressToPackets[packet.progress] = [];
+            }
+            progressToPackets[packet.progress].push(packet);
+            progressNums = packet.maxProgress;
         }
 
         if (!isNonOriented) {
@@ -44,7 +55,12 @@ export default function CustomEdge({
         }
 
         if (id === `${packet.to}-${packet.from}`) {
-            packets.push(packet);
+
+            if (progressToPackets[packet.progress] === undefined) {
+                progressToPackets[packet.progress] = [];
+            }
+            progressToPackets[packet.progress].push(packet);
+            progressNums = packet.maxProgress;
         }
     }
 
@@ -74,27 +90,32 @@ export default function CustomEdge({
         });
     }
 
-    let xDifference = (sourceCenterX - targetCenterX) / (data.progressNums + 1);
-    let yDifference = (sourceCenterY - targetCenterY) / (data.progressNums + 1);
+    let xDifference = (sourceCenterX - targetCenterX) / (progressNums);
+    let yDifference = (sourceCenterY - targetCenterY) / (progressNums);
 
     let from = id.split("-")[0];
 
     let places = [];
 
-    for (let packet of packets) {
+    for (let progress in progressToPackets) {
 
-        if (packet.from === from) {
-            places.push({
-                x: sourceCenterX - xDifference * packet.progress - 5,
-                y: sourceCenterY - yDifference * packet.progress - 11,
-                color: packet.color
-            });
-        } else {
-            places.push({
-                x: targetCenterX + xDifference * packet.progress - 5,
-                y: targetCenterY + yDifference * packet.progress - 11,
-                color: packet.color
-            })
+        for (let i = 0; i < progressToPackets[progress].length; ++i) {
+
+            let packet = progressToPackets[progress][i];
+
+            if (packet.from === from) {
+                places.push({
+                    x: sourceCenterX - xDifference * packet.progress - 5 - (isX ? xDif : -xDif) * (i / progressToPackets[progress].length),
+                    y: sourceCenterY - yDifference * packet.progress - 11 - (isY ? yDif : -yDif) * (i / progressToPackets[progress].length),
+                    color: "#00f0ff"
+                });
+            } else {
+                places.push({
+                    x: targetCenterX + xDifference * packet.progress - 5 + (isX ? xDif : -xDif) * (i / progressToPackets[progress].length),
+                    y: targetCenterY + yDifference * packet.progress - 11 + (isY ? yDif : -yDif) * (i / progressToPackets[progress].length),
+                    color: "#00f0ff"
+                })
+            }
         }
     }
 

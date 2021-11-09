@@ -3,19 +3,19 @@ import ReactFlow, {ArrowHeadType} from 'react-flow-renderer';
 import {useState} from "react";
 import NodeComponent from "./domains/NodeComponent";
 import {
-    message,
-    notification,
     Button,
-    InputNumber,
-    Space,
-    Upload,
-    Input,
-    Modal,
     Card,
     Col,
+    Input,
+    InputNumber,
+    message,
+    Modal,
+    notification,
     Row,
+    Select,
     Slider,
-    Select
+    Space,
+    Upload
 } from 'antd';
 import 'antd/dist/antd.css';
 import {UploadOutlined} from '@ant-design/icons';
@@ -255,7 +255,7 @@ function App() {
     const [isAnimation, setIsAnimation] = useState(false);
     const [method, setMethod] = useState("random");
     const [channelType, setChannelType] = useState("virtual");
-    const [ttl, setTtl] = useState(100);
+    const [ttlCount, setTtlCount] = useState(100);
     const [packetsCount, setPacketsCount] = useState(3);
 
     const getSelectNodes = () => {
@@ -759,15 +759,15 @@ function App() {
                         <Select defaultValue={channelType}
                                 style={{ width: 200 }}
                                 onSelect={setChannelType}
-                                disabled={getSelectNodes(state).length !== 2 || isAnimation || !isPathExist() || method !== "adaptive"}>
+                                disabled={getSelectNodes(state).length !== 2 || isAnimation || !isPathExist()}>
                             <Option value="virtual">Virtual channel</Option>
                             <Option value="deitagramm">Deitagramm channel</Option>
                         </Select>
                         <InputNumber
                             min={1}
                             max={500}
-                            value={ttl}
-                            onChange={setTtl}
+                            value={ttlCount}
+                            onChange={setTtlCount}
                             placeholder="TTL"
                             style={{width: '115px'}}
                         />
@@ -795,63 +795,75 @@ function App() {
 
                                     updateState(state);
 
-                                    packets.push({
-                                        from: sourceNode.id,
-                                        to: sourceNode.id,
-                                        progress: progressNums,
-                                        step: 0,
-                                        color: getRandomColor()
-                                    });
+                                    for (let i = 0; i < packetsCount; ++i) {
+                                        packets.push({
+                                            from: sourceNode.id,
+                                            to: sourceNode.id,
+                                            progress: 0,
+                                            maxProgress: 0,
+                                            packetNumber: i + 1,
+                                            ttl: ttlCount,
+                                            currentTtl: 0,
+                                            color: "#000000"
+                                        });
+                                    }
 
-                                    let packetFound = undefined;
-                                    while (!packetFound && !isStop) {
+                                    while (!isStop && packets.length > 0) {
+
+                                        let calculated = {};
+
+                                        packets = packets.filter(p => p.progress !== p.maxProgress - 1 || state.edges.filter(a => a.from === p.to).length !== 0);
+                                        packets = packets.filter(p => p.progress !== p.maxProgress || p.to !== targetNode.id);
+                                        packets = packets.filter(p => p.currentTtl !== p.ttl);
+
+                                        if (packets.length === 0) {
+                                            break;
+                                        }
 
                                         for (let i = 0; i < packets.length; ++i) {
 
                                             let packet = packets[i];
 
-                                            if (packet.progress === progressNums) {
+                                            if (packet.progress === packet.maxProgress) {
 
-                                                if (packet.to === targetNode.id) {
-                                                    packetFound = packet;
-                                                    break;
+                                                packet.progress = 1;
+
+                                                const edges = state.edges.filter(a => a.from === packet.to);
+
+                                                if (calculated[packet.from] === undefined) {
+                                                    calculated[packet.from] = {};
                                                 }
 
-                                                packet.progress = 0;
+                                                if (calculated[packet.from][packet.to] === undefined) {
+                                                    calculated[packet.from][packet.to] = edges[Math.floor(Math.random() * edges.length)];
+                                                }
+
+                                                let nextEdge = calculated[packet.from][packet.to];
+
                                                 packet.from = packet.to;
-                                                packet.step++;
 
-                                                const edges = state.edges.filter(a => a.from === packet.from);
-
-                                                if (edges.length === 0) {
-                                                    isStop = true;
-                                                    break;
+                                                if (channelType !== "virtual") {
+                                                    nextEdge = edges[Math.floor(Math.random() * edges.length)];
                                                 }
 
-                                                packet.to = edges[Math.floor(Math.random() * edges.length)].to;
+                                                packet.to = nextEdge.to;
+                                                packet.maxProgress = nextEdge.weigh + 1;
                                             } else {
                                                 packet.progress++;
+                                                packet.currentTtl++;
                                             }
                                         }
 
-                                        if (packetFound) {
+                                        packets = packets.filter(p => p.progress !== p.maxProgress || p.to !== targetNode.id);
+                                        packets = packets.filter(p => p.currentTtl !== p.ttl);
+
+                                        if (packets.length === 0) {
                                             break;
                                         }
 
                                         updateState(state);
 
                                         await sleep(animationSpeed);
-                                    }
-
-                                    if (packetFound) {
-                                        notification.open(
-                                            {
-                                                message: `Package delivered from ${sourceNode.id} node to ${targetNode.id} node.`,
-                                                description: `Step count: ${packetFound.step}`,
-                                                placement: 'bottomRight',
-                                                duration: 1000000
-                                            }
-                                        )
                                     }
 
                                     isStop = false;
@@ -867,63 +879,55 @@ function App() {
 
                                     let [sourceNode, targetNode] = getSelectNodes();
 
-                                    let id = 0;
-                                    packets.push({
-                                        id,
-                                        from: sourceNode.id,
-                                        to: sourceNode.id,
-                                        progress: progressNums,
-                                        step: 0,
-                                        color: getRandomColor(),
-                                    });
+                                    for (let i = 0; i < packetsCount; ++i) {
+                                        packets.push({
+                                            from: sourceNode.id,
+                                            to: sourceNode.id,
+                                            progress: 0,
+                                            maxProgress: 0,
+                                            packetNumber: i + 1,
+                                            ttl: ttlCount,
+                                            currentTtl: 0
+                                        });
+                                    }
 
-                                    let packetFound = undefined;
+                                    while (!isStop && packets.length > 0) {
 
-                                    while (!packetFound && !isStop) {
+                                        packets = packets.filter(p => p.progress !== p.maxProgress - 1 || state.edges.filter(a => a.from === p.to).length !== 0);
+                                        packets = packets.filter(p => p.progress !== p.maxProgress || p.to !== targetNode.id);
+                                        packets = packets.filter(p => p.currentTtl !== p.ttl);
 
-                                        for (let delivered of packets.filter(a => a.progress === progressNums)) {
+                                        let calculated = {};
 
-                                            if (delivered.to === targetNode.id) {
-                                                packetFound = delivered;
-                                                break;
-                                            }
-
-                                            let color = getRandomColor();
+                                        for (let delivered of packets.filter(a => a.progress === a.maxProgress)) {
 
                                             state.edges
                                                 .filter(edge => edge.from === delivered.to && edge.to !== delivered.from)
                                                 .forEach(nextEdge => {
 
-                                                    debugger
                                                     packets.push({
-                                                        id: id++,
                                                         from: delivered.to,
                                                         to: nextEdge.to,
                                                         progress: 0,
-                                                        step: delivered.step + 1,
-                                                        color
+                                                        maxProgress: nextEdge.weigh + 1,
+                                                        packetNumber: delivered.packetNumber,
+                                                        ttl: delivered.ttl,
+                                                        currentTtl: delivered.currentTtl,
                                                     });
                                                 });
                                         }
 
-                                        packets = packets.filter(a => a.progress !== progressNums);
+                                        packets.forEach(packet => {
+                                            packet.progress++;
+                                            packet.currentTtl++;
+                                        });
 
-                                        packets.forEach(packet => packet.progress++);
+                                        packets = packets.filter(p => p.progress !== p.maxProgress || p.to !== targetNode.id);
+                                        packets = packets.filter(p => p.currentTtl !== p.ttl);
 
                                         updateState(state);
 
                                         await sleep(animationSpeed);
-                                    }
-
-                                    if (packetFound) {
-                                        notification.open(
-                                            {
-                                                message: `Package delivered from ${sourceNode.id} node to ${targetNode.id} node.`,
-                                                description: `Step count: ${packetFound.step}`,
-                                                placement: 'bottomRight',
-                                                duration: 1000000
-                                            }
-                                        )
                                     }
 
                                     isStop = false;
