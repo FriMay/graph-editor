@@ -1,6 +1,7 @@
 import './App.css';
 import ReactFlow, {ArrowHeadType} from 'react-flow-renderer';
 import {useState} from "react";
+import uuid from 'react-uuid';
 import NodeComponent from "./domains/NodeComponent";
 import {
     Button,
@@ -257,6 +258,7 @@ function App() {
     const [channelType, setChannelType] = useState("virtual");
     const [ttlCount, setTtlCount] = useState(100);
     const [packetsCount, setPacketsCount] = useState(3);
+    const [routingTable, setRoutingTable] = useState([]);
 
     const getSelectNodes = () => {
 
@@ -785,15 +787,17 @@ function App() {
                             disabled={getSelectNodes(state).length !== 2 || isAnimation || !isPathExist()}
                             onClick={async () => {
 
+                                setIsAnimation(true);
+
+                                let [sourceNode, targetNode] = getSelectNodes();
+
+                                clearResults();
+
+                                updateState(state);
+
                                 if (method === "random") {
 
-                                    setIsAnimation(true);
-
-                                    let [sourceNode, targetNode] = getSelectNodes();
-
-                                    clearResults();
-
-                                    updateState(state);
+                                    setRoutingTable([]);
 
                                     for (let i = 0; i < packetsCount; ++i) {
                                         packets.push({
@@ -804,13 +808,191 @@ function App() {
                                             packetNumber: i + 1,
                                             ttl: ttlCount,
                                             currentTtl: 0,
-                                            color: "#000000"
+                                            color: getRandomColor()
                                         });
                                     }
 
                                     while (!isStop && packets.length > 0) {
 
                                         let calculated = {};
+
+                                        packets = packets.filter(p => p.progress !== p.maxProgress - 1 || state.edges.filter(a => a.from === p.to).length !== 0);
+                                        packets = packets.filter(p => p.progress !== p.maxProgress || p.to !== targetNode.id);
+                                        packets = packets.filter(p => p.currentTtl <= p.ttl || p.progress !== p.maxProgress);
+
+                                        if (packets.length === 0) {
+                                            break;
+                                        }
+
+                                        debugger;
+
+                                        for (let i = 0; i < packets.length; ++i) {
+
+                                            let packet = packets[i];
+
+                                            if (packet.progress === packet.maxProgress) {
+
+                                                packet.progress = 1;
+
+                                                const edges = state.edges.filter(a => a.from === packet.to);
+
+                                                if (calculated[packet.from] === undefined) {
+                                                    calculated[packet.from] = {};
+                                                }
+
+                                                if (calculated[packet.from][packet.to] === undefined) {
+                                                    calculated[packet.from][packet.to] = edges[Math.floor(Math.random() * edges.length)];
+                                                }
+
+                                                let nextEdge = calculated[packet.from][packet.to];
+
+                                                packet.from = packet.to;
+
+                                                if (channelType !== "virtual") {
+                                                    nextEdge = edges[Math.floor(Math.random() * edges.length)];
+                                                }
+
+                                                packet.to = nextEdge.to;
+                                                packet.maxProgress = nextEdge.weigh + 2;
+                                                packet.currentTtl += nextEdge.weigh;
+                                            } else {
+                                                packet.progress++;
+                                            }
+                                        }
+
+                                        if (packets.length === 0) {
+                                            break;
+                                        }
+
+                                        updateState(state);
+
+                                        await sleep(animationSpeed);
+                                    }
+
+                                } else if (method === "avalanche") {
+
+                                    setRoutingTable([]);
+
+                                    let isVirtual = channelType === "virtual";
+
+                                    const edges = state.edges.filter(a => a.from === sourceNode.id);
+
+                                    let nextEdge = edges[Math.floor(Math.random() * edges.length)];
+
+                                    for (let i = 0; i < packetsCount; ++i) {
+
+                                        let edge = isVirtual ? nextEdge : edges[Math.floor(Math.random() * edges.length)];
+
+                                        packets.push({
+                                            id: uuid(),
+                                            from: sourceNode.id,
+                                            to: edge.to,
+                                            progress: 0,
+                                            maxProgress: edge.weigh + 2,
+                                            packetNumber: i + 1,
+                                            ttl: ttlCount,
+                                            currentTtl: edge.weigh,
+                                            color: getRandomColor()
+                                        });
+                                    }
+
+                                    let alreadyDelivered = {};
+
+                                    while (!isStop) {
+
+                                        packets
+                                            .filter(p => p.progress === p.maxProgress && p.to === targetNode.id)
+                                            .forEach(p => {
+                                                alreadyDelivered[p.packetNumber] = true
+                                            });
+
+                                        let toDelete = {};
+
+                                        packets
+                                            .filter(p => p.currentTtl >= p.ttl && p.maxProgress === p.progress)
+                                            .forEach(p => toDelete[p.id] = true);
+
+                                        for (let delivered of packets.filter(a => a.progress === a.maxProgress)) {
+
+                                            if (alreadyDelivered[delivered.packetNumber] !== undefined) {
+                                                toDelete[delivered.id] = true;
+                                                continue;
+                                            }
+
+                                            state.edges
+                                                .filter(edge => edge.from === delivered.to && edge.to !== delivered.from)
+                                                .forEach(nextEdge => {
+
+                                                    packets.push({
+                                                        id: uuid(),
+                                                        from: delivered.to,
+                                                        to: nextEdge.to,
+                                                        progress: 0,
+                                                        maxProgress: nextEdge.weigh + 2,
+                                                        packetNumber: delivered.packetNumber,
+                                                        ttl: delivered.ttl,
+                                                        currentTtl: delivered.currentTtl + nextEdge.weigh,
+                                                        color: delivered.color
+                                                    });
+                                                });
+                                        }
+
+                                        packets = packets.filter(a => a.progress !== a.maxProgress);
+
+                                        packets = packets.filter(p => toDelete[p.id] === undefined);
+
+                                        packets.forEach(packet => {
+                                            packet.progress++;
+                                        });
+
+                                        if (packets.length === 0) {
+                                            break;
+                                        }
+
+                                        updateState(state);
+
+                                        await sleep(animationSpeed);
+                                    }
+
+                                } else {
+
+                                    if (routingTable.length === 0) {
+
+                                        let newRoutingTable = [];
+
+                                        let row = [];
+
+                                        // for (state.nodes)
+
+                                    }
+
+                                    for (let i = 0; i < packetsCount; ++i) {
+                                        packets.push({
+                                            from: sourceNode.id,
+                                            to: sourceNode.id,
+                                            progress: 0,
+                                            maxProgress: 0,
+                                            packetNumber: i + 1,
+                                            ttl: ttlCount,
+                                            currentTtl: 0,
+                                            steps: 0,
+                                            color: "#000000"
+                                        });
+                                    }
+
+                                    const setRoutingNode = (nextNode, value) => {
+
+
+
+                                    }
+
+                                    while (!isStop && packets.length > 0) {
+
+                                        let calculated = {};
+
+                                        packets
+                                            .filter(p => p.progress === p.maxProgress - 1 && state.edges.filter(a => a.from === p.to).length === 0)
+                                            .forEach();
 
                                         packets = packets.filter(p => p.progress !== p.maxProgress - 1 || state.edges.filter(a => a.from === p.to).length !== 0);
                                         packets = packets.filter(p => p.progress !== p.maxProgress || p.to !== targetNode.id);
@@ -865,78 +1047,14 @@ function App() {
 
                                         await sleep(animationSpeed);
                                     }
-
-                                    isStop = false;
-                                    setIsAnimation(false);
-
-                                    clearResults(state);
-
-                                    updateState(state);
-
-                                } else if (method === "avalanche") {
-
-                                    setIsAnimation(true);
-
-                                    let [sourceNode, targetNode] = getSelectNodes();
-
-                                    for (let i = 0; i < packetsCount; ++i) {
-                                        packets.push({
-                                            from: sourceNode.id,
-                                            to: sourceNode.id,
-                                            progress: 0,
-                                            maxProgress: 0,
-                                            packetNumber: i + 1,
-                                            ttl: ttlCount,
-                                            currentTtl: 0
-                                        });
-                                    }
-
-                                    while (!isStop && packets.length > 0) {
-
-                                        packets = packets.filter(p => p.progress !== p.maxProgress - 1 || state.edges.filter(a => a.from === p.to).length !== 0);
-                                        packets = packets.filter(p => p.progress !== p.maxProgress || p.to !== targetNode.id);
-                                        packets = packets.filter(p => p.currentTtl !== p.ttl);
-
-                                        let calculated = {};
-
-                                        for (let delivered of packets.filter(a => a.progress === a.maxProgress)) {
-
-                                            state.edges
-                                                .filter(edge => edge.from === delivered.to && edge.to !== delivered.from)
-                                                .forEach(nextEdge => {
-
-                                                    packets.push({
-                                                        from: delivered.to,
-                                                        to: nextEdge.to,
-                                                        progress: 0,
-                                                        maxProgress: nextEdge.weigh + 1,
-                                                        packetNumber: delivered.packetNumber,
-                                                        ttl: delivered.ttl,
-                                                        currentTtl: delivered.currentTtl,
-                                                    });
-                                                });
-                                        }
-
-                                        packets.forEach(packet => {
-                                            packet.progress++;
-                                            packet.currentTtl++;
-                                        });
-
-                                        packets = packets.filter(p => p.progress !== p.maxProgress || p.to !== targetNode.id);
-                                        packets = packets.filter(p => p.currentTtl !== p.ttl);
-
-                                        updateState(state);
-
-                                        await sleep(animationSpeed);
-                                    }
-
-                                    isStop = false;
-                                    setIsAnimation(false);
-
-                                    clearResults();
-
-                                    updateState(state);
                                 }
+
+                                isStop = false;
+                                setIsAnimation(false);
+
+                                clearResults(state);
+
+                                updateState(state);
                             }}
                         > Start </Button>
                         <Button

@@ -16,6 +16,8 @@ export default function CustomEdge({
                                        markerEndId,
                                    }) {
 
+    debugger
+
     let sourceCenterX = sourceX;
     let sourceCenterY = sourceY + 25;
 
@@ -64,21 +66,19 @@ export default function CustomEdge({
         }
     }
 
-    let xDif = 0, yDif = 0;
+    let distX = Math.abs(Math.abs(sourceCenterX) - Math.abs(targetCenterX));
+    let distY = Math.abs(Math.abs(sourceCenterY) - Math.abs(targetCenterY));
+
+    let gip = Math.sqrt(Math.pow(distX, 2) + Math.pow(distY, 2));
+
+    let cos = distX / gip;
+
+    let xDif = cos * 25;
+
+    let yDif = Math.sqrt(Math.pow(25, 2) - Math.pow(xDif, 2));
+
     let x, y;
     if (!isNonOriented) {
-
-        let distX = Math.abs(Math.abs(sourceCenterX) - Math.abs(targetCenterX));
-        let distY = Math.abs(Math.abs(sourceCenterY) - Math.abs(targetCenterY));
-
-        let gip = Math.sqrt(Math.pow(distX, 2) + Math.pow(distY, 2));
-
-        let cos = distX / gip;
-
-        xDif = cos * 25;
-
-        yDif = Math.sqrt(Math.pow(25, 2) - Math.pow(xDif, 2));
-
         x = targetCenterX + ((isX ? xDif / 2 : -xDif) * 2.5) + (isY ? -yDif : yDif) * (1 / label.toString().length);
         y = targetCenterY + (isY ? yDif : -yDif * 2) + (isX ? xDif : -xDif);
     } else {
@@ -107,13 +107,13 @@ export default function CustomEdge({
                 places.push({
                     x: sourceCenterX - xDifference * packet.progress - 5 - (isX ? xDif : -xDif) * (i / progressToPackets[progress].length),
                     y: sourceCenterY - yDifference * packet.progress - 11 - (isY ? yDif : -yDif) * (i / progressToPackets[progress].length),
-                    color: "#00f0ff"
+                    color: packet.color
                 });
             } else {
                 places.push({
                     x: targetCenterX + xDifference * packet.progress - 5 + (isX ? xDif : -xDif) * (i / progressToPackets[progress].length),
                     y: targetCenterY + yDifference * packet.progress - 11 + (isY ? yDif : -yDif) * (i / progressToPackets[progress].length),
-                    color: "#00f0ff"
+                    color: packet.color
                 })
             }
         }
