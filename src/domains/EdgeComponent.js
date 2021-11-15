@@ -16,8 +16,6 @@ export default function CustomEdge({
                                        markerEndId,
                                    }) {
 
-    debugger
-
     let sourceCenterX = sourceX;
     let sourceCenterY = sourceY + 25;
 

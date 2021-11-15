@@ -23,6 +23,7 @@ import {UploadOutlined} from '@ant-design/icons';
 import calculateDijkstra, {calculateAll} from "./domains/DijkstraAlgorithm";
 import CustomEdge from "./domains/EdgeComponent";
 import calculateFloyd from "./domains/FloydAlgorithm";
+import MatrixTable from "./domains/MatrixTable";
 
 const { TextArea } = Input;
 
@@ -258,7 +259,8 @@ function App() {
     const [channelType, setChannelType] = useState("virtual");
     const [ttlCount, setTtlCount] = useState(100);
     const [packetsCount, setPacketsCount] = useState(3);
-    const [routingTable, setRoutingTable] = useState([]);
+    const [isRoutingTableVisible, setIsRoutingTableVisible] = useState(false);
+    const [routingTable, setRoutingTable] = useState({});
 
     const getSelectNodes = () => {
 
@@ -462,6 +464,8 @@ function App() {
                               value={matrixValue}
                               onChange={(text) => {
 
+                                  setRoutingTable({});
+
                                   let newState = getStateFromMatrix(state, text.target.value);
 
                                   if (newState) {
@@ -474,6 +478,8 @@ function App() {
                     />
                     <Space>
                         <Button type="primary" onClick={() => {
+
+                            setRoutingTable({});
 
                             clearResults(state);
 
@@ -491,6 +497,8 @@ function App() {
                             type="primary"
                             disabled={getSelectNodes(state).length === 0}
                             onClick={() => {
+
+                                setRoutingTable({});
 
                                 clearResults();
 
@@ -567,6 +575,8 @@ function App() {
                             disabled={getSelectNodes(state).length !== 2}
                             onClick={() => {
 
+                                setRoutingTable({});
+
                                 clearResults();
 
                                 if (!edgeWeigh) {
@@ -610,6 +620,7 @@ function App() {
                             disabled={isBlock(state)}
                             onClick={() => {
 
+                                setRoutingTable({});
                                 clearResults(state);
 
                                 if (!edgeWeigh) {
@@ -642,6 +653,8 @@ function App() {
                             type="primary"
                             onClick={() => {
 
+                                setRoutingTable({});
+
                                 clearResults();
 
                                 let text = getTextFromState(state);
@@ -666,6 +679,8 @@ function App() {
                             type="primary"
                             onClick={() => {
 
+                                setRoutingTable({});
+
                                 clearResults(state);
 
                                 const filename = "graph.json";
@@ -688,6 +703,8 @@ function App() {
                             showUploadList={false}
                             beforeUpload={file => {
 
+                                setRoutingTable({});
+
                                 file.text()
                                     .then(text => {
 
@@ -701,6 +718,8 @@ function App() {
                         <Upload
                             showUploadList={false}
                             beforeUpload={file => {
+
+                                setRoutingTable({});
 
                                 file.text()
                                     .then(text => {
@@ -724,6 +743,8 @@ function App() {
                             disabled={getSelectNodes(state).length !== 2}
                             onClick={() => {
 
+                                setRoutingTable({});
+
                                 calc(calculateDijkstra, 'Dijkstra');
 
                             }}>Find optimal path by "Dijkstra's" algorithm</Button>
@@ -732,6 +753,8 @@ function App() {
                             disabled={getSelectNodes(state).length !== 2}
                             onClick={() => {
 
+                                setRoutingTable({});
+
                                 calc(calculateFloyd, 'Floyd');
 
                             }}>Find optimal path by "Floyd's" algorithm</Button>
@@ -739,6 +762,7 @@ function App() {
                             type="primary"
                             disabled={getSelectNodes(state).length !== 0 || state.edges.length === 0}
                             onClick={() => {
+                                setRoutingTable({});
 
                                 setIsModalVisible(true);
 
@@ -797,7 +821,7 @@ function App() {
 
                                 if (method === "random") {
 
-                                    setRoutingTable([]);
+                                    setRoutingTable({});
 
                                     for (let i = 0; i < packetsCount; ++i) {
                                         packets.push({
@@ -818,13 +842,11 @@ function App() {
 
                                         packets = packets.filter(p => p.progress !== p.maxProgress - 1 || state.edges.filter(a => a.from === p.to).length !== 0);
                                         packets = packets.filter(p => p.progress !== p.maxProgress || p.to !== targetNode.id);
-                                        packets = packets.filter(p => p.currentTtl <= p.ttl || p.progress !== p.maxProgress);
+                                        packets = packets.filter(p => p.currentTtl < p.ttl || p.progress !== p.maxProgress);
 
                                         if (packets.length === 0) {
                                             break;
                                         }
-
-                                        debugger;
 
                                         for (let i = 0; i < packets.length; ++i) {
 
@@ -871,7 +893,7 @@ function App() {
 
                                 } else if (method === "avalanche") {
 
-                                    setRoutingTable([]);
+                                    setRoutingTable({});
 
                                     let isVirtual = channelType === "virtual";
 
@@ -956,14 +978,33 @@ function App() {
 
                                 } else {
 
-                                    if (routingTable.length === 0) {
+                                    let routingTableLength = 0;
 
-                                        let newRoutingTable = [];
+                                    for (let i in routingTable) {
+                                        routingTableLength++;
+                                    }
 
-                                        let row = [];
+                                    let newRoutingTable = routingTable;
 
-                                        // for (state.nodes)
+                                    if (routingTableLength === 0) {
 
+                                        newRoutingTable = {};
+
+                                        let nodeIds = [];
+                                        for (let i in state.nodes) {
+                                            nodeIds.push(i);
+                                        }
+
+                                        nodeIds = nodeIds.sort();
+
+                                        for (let i of nodeIds) {
+
+                                            newRoutingTable[i] = {};
+
+                                            for (let j of nodeIds) {
+                                                newRoutingTable[i][j] = null;
+                                            }
+                                        }
                                     }
 
                                     for (let i = 0; i < packetsCount; ++i) {
@@ -975,15 +1016,8 @@ function App() {
                                             packetNumber: i + 1,
                                             ttl: ttlCount,
                                             currentTtl: 0,
-                                            steps: 0,
-                                            color: "#000000"
+                                            color: getRandomColor()
                                         });
-                                    }
-
-                                    const setRoutingNode = (nextNode, value) => {
-
-
-
                                     }
 
                                     while (!isStop && packets.length > 0) {
@@ -991,12 +1025,27 @@ function App() {
                                         let calculated = {};
 
                                         packets
-                                            .filter(p => p.progress === p.maxProgress - 1 && state.edges.filter(a => a.from === p.to).length === 0)
-                                            .forEach();
+                                            .filter(p => p.progress === p.maxProgress)
+                                            .forEach(p => {
 
-                                        packets = packets.filter(p => p.progress !== p.maxProgress - 1 || state.edges.filter(a => a.from === p.to).length !== 0);
+                                                let currentValue = newRoutingTable[sourceNode.id][p.to] != null
+                                                    ? newRoutingTable[sourceNode.id][p.to]
+                                                    : Infinity;
+
+                                                newRoutingTable[sourceNode.id][p.to] = Math.min(
+                                                    currentValue,
+                                                    p.currentTtl
+                                                );
+                                            });
+
+                                        setRoutingTable(JSON.parse(JSON.stringify(newRoutingTable)));
+
+                                        console.log("Routing table:");
+                                        console.log(newRoutingTable);
+
+                                        packets = packets.filter(p => p.progress !== p.maxProgress || state.edges.filter(a => a.from === p.to).length !== 0);
                                         packets = packets.filter(p => p.progress !== p.maxProgress || p.to !== targetNode.id);
-                                        packets = packets.filter(p => p.currentTtl !== p.ttl);
+                                        packets = packets.filter(p => p.currentTtl < p.ttl || p.progress !== p.maxProgress);
 
                                         if (packets.length === 0) {
                                             break;
@@ -1029,15 +1078,12 @@ function App() {
                                                 }
 
                                                 packet.to = nextEdge.to;
-                                                packet.maxProgress = nextEdge.weigh + 1;
+                                                packet.maxProgress = nextEdge.weigh + 2;
+                                                packet.currentTtl += nextEdge.weigh;
                                             } else {
                                                 packet.progress++;
-                                                packet.currentTtl++;
                                             }
                                         }
-
-                                        packets = packets.filter(p => p.progress !== p.maxProgress || p.to !== targetNode.id);
-                                        packets = packets.filter(p => p.currentTtl !== p.ttl);
 
                                         if (packets.length === 0) {
                                             break;
@@ -1077,9 +1123,23 @@ function App() {
                             defaultValue={animationSpeed}
                             onChange={(value) => animationSpeed = value}
                             style={{width: "200px"}} />
+                        <Button
+                            type="primary"
+                            onClick={() => {
+                                setRoutingTable({});
+                            }}>Clear routing table</Button>
                     </Space>
                     <br/><br/>
                 </div>
+
+                {
+                    method !== 'adaptive'
+                        ? <></>
+                        : <MatrixTable
+                            style={{ zIndex: 1000, position: 'absolute', right: '0px'}}
+                            props={{state, routingTable }}
+                        />
+                }
 
                 <ReactFlow
                     elements={getOutputStruct(state, packets)}
